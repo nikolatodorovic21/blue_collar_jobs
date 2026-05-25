@@ -1,186 +1,114 @@
-# State of the App — Audit Report
+---
+title: App State Audit
+type: audit
+status: living
+updated: 2026-05-25b
+---
 
-> **Date:** 2026-05-25
-> **Auditor:** Senior Architecture Review
-> **Project:** Poslovi — Blue-Collar Job Marketplace
+# App State Audit
+
+> Single source of truth for **what's true about the running app right now.** Architecture and endpoint reference lives in [[project-overview]]; the roadmap in [[project-plan]]; chronological history in [[worklog]].
+>
+> Each item below is verified either live (`live` — exercised via curl + DB inspection or browser) or by static code trace (`static`). Update checkboxes as work lands.
+
+**Last verified:** 2026-05-25
 
 ---
 
-## Executive Summary
+## ✅ Works
 
-The application is a **partially working proof-of-concept**. Core job listing and assignment flows function, but the authentication system is disconnected from the main backend, there is zero input validation, and no security hardening exists anywhere. The app is **not deployable** in current state.
+Verified working in the current build.
 
-> [!success] Resolved in Phase 0
-> ~~The app runs against **two separate servers** simultaneously~~ — **fixed**.
-> Auth now runs on **Express + MongoDB (:5000)** via `POST /api/users` and `POST /api/auth/login`. Passwords are bcrypt-hashed. `json-server` is no longer used. See [[project-overview]] for the current architecture.
+### Auth
+- [x] **Register** — `POST /api/users` validates with Zod (`registerSchema.strict()`), returns 409 on duplicate email, hashes with bcrypt (10 rounds), strips password via `toJSON`, **issues JWT + CSRF cookies on success (auto-login)**. *(live)*
+- [x] **Login** — `POST /api/auth/login` validates with Zod, case-insensitive email lookup, `bcrypt.compare`, generic 401 on miss, **issues JWT in httpOnly cookie + CSRF token cookie**. *(live)*
+- [x] **JWT in httpOnly cookie** — signed HS256, 7-day expiry, `SameSite=Lax`, `Secure` only in production. Payload `{ sub, role }`. `document.cookie` cannot read it. *(live)*
+- [x] **`requireAuth` middleware** — reads `req.cookies.token`, `jwt.verify`, attaches `req.user = { id, role }`; 401 on missing/invalid. *(live)*
+- [x] **`requireRole('client' | 'worker')` middleware** — gates job-create / bid-submit / bid-accept by `req.user.role`. *(live)*
+- [x] **CSRF protection** — `csrf-csrf` double-submit. Non-httpOnly `csrf-token` cookie + `X-CSRF-Token` header required on all mutating requests (login/register exempt). *(live)*
+- [x] **Logout** — `POST /api/auth/logout` clears the token cookie. *(live)*
+- [x] **`GET /api/auth/me`** — returns the current user from DB (sourced from cookie identity), used by frontend on app boot to rehydrate the display cache. *(live)*
+- [x] **Server-side filtering on GETs** — `GET /api/bids` ignores any `?workerId=` and returns only `req.user.id`'s bids; `GET /api/jobs/:id/bids` returns all bids only to the job owner, otherwise only the caller's own bid. *(live)*
+- [x] **Identity locked out of request bodies** — Zod `.strict()` schemas **reject** requests with unknown fields (400 `Neispravni podaci`, `errors.\_ = "Unrecognized keys: userId, role"`). Confirmed live via curl. Identity is only ever derived from `req.user`. *(live)*
+- [x] **Password never leaves backend** — `toJSON` transform on `User` schema deletes `password` from every serialization. *(live)*
 
----
+### Jobs
+- [x] **Post a job** — `POST /api/jobs` requires `requireAuth` + `requireRole('client')` + Zod validation; `userId` is set from `req.user.id` (token, not body). Job starts with `status: 'open'`. *(live)*
+- [x] **Get all jobs** — `GET /api/jobs` returns all jobs with the new `status` + `assignedWorkerId` shape. *(live)*
+- [x] **Get one job** — `GET /api/jobs/:id` returns the job or 404. *(live)*
 
-## 1. Currently Implemented Features
+### Bidding (Tier 1)
+- [x] **Submit a bid** — `POST /api/jobs/:id/bids` (requires auth + `worker` role + Zod). `workerId` is from `req.user.id`; 403 self-bid, 409 job-not-open. *(live)*
+- [x] **List bids for a job** — `GET /api/jobs/:id/bids` (auth required). Job owner sees all bids with worker `name` populated; non-owners see only their own bid for that job. *(live)*
+- [x] **Worker's own bids** — `GET /api/bids` (auth + `worker` role). Returns `req.user.id`'s bids; query params ignored. *(live)*
+- [x] **Accept a bid** — `PATCH /api/bids/:id/accept` (auth + `client` role). Ownership is checked against `req.user.id` vs `job.userId`. Flips chosen bid → `accepted`, siblings → `rejected`, job → `assigned` with `assignedWorkerId`. *(live — confirmed via curl + DB)*
+- [x] **"Postavi ponudu" UI** — workers see the button on open jobs they don't own; modal collects amount + optional message. *(live, served via Vite)*
+- [x] **"Moje ponude" UI** — worker route `/jobs` shows their bids with status badges. *(static — DOM compiles, end-to-end click-through not run by the agent)*
+- [x] **"Ponude na moj posao" UI** — client route `/jobs/:id/bids` shows all bids with per-bid "Prihvati" buttons gated on ownership + status. *(static)*
 
-### Fully Functional
-| Feature | Files | Notes |
-|---|---|---|
-| Job listing | `HomeView.vue`, `api.ts` | GET `/api/jobs` works |
-| Take a job | `HomeView.vue`, `api.ts` | PATCH `/api/jobs/:id` works |
-| Create a job | `api.ts` | POST `/api/jobs` works (no validation) |
-| Navigation + auth guards | `NavBar.vue`, `router/index.ts` | localStorage-based, functional |
-| JobsTable component | `JobsTable.vue` | Clean, reusable |
-| "My Jobs" view | `JobsView.vue` | Filters by userId correctly |
-
-### Partially Implemented
-| Feature | Status | Problem |
-|---|---|---|
-| Login | Works only with json-server on `:3000` | Hardcoded wrong port, no real token |
-| Register | Works only with json-server on `:3000` | `Date.now()` for IDs, plaintext password |
-| Auth service | Runs, but insecure | Compares plaintext passwords, stores full user object in localStorage |
-| JobReviews component | Display-only stub | Never rendered in any view, receives no data |
-
-### Stubs / Placeholders
-| Feature | File | Status |
-|---|---|---|
-| About page | `AboutView.vue` | Heading + placeholder text only |
-| Contact page | `ContactView.vue` | Heading + placeholder text only |
-| Real-time polling | `jobs.service.ts` | Code exists but `startPolling()` is never called |
-
----
-
-## 2. Tech Stack Verification
-
-### Backend — Express 5 + TypeScript + MongoDB
-- **Status: Operational, minimal**
-- Express app starts and connects to MongoDB (`localhost:27017/jobs-db`)
-- 3 endpoints working: `GET /api/jobs`, `POST /api/jobs`, `PATCH /api/jobs/:id`
-- `dotenv` is installed but never called — `app.ts` does not call `require('dotenv').config()`
-- MongoDB connection string is hardcoded in `config/db.ts`
-
-### Frontend — Vue 3 + Vite + TypeScript
-- **Status: Operational, inconsistent**
-- Vite dev server runs cleanly
-- Vue Router guards work
-- Vuex store is configured but views bypass it — state is managed locally in each view
-- `services/jobs.service.ts` is well-structured but **views call `api.ts` directly** instead
-
-### Database Integration
-| Data | Where Stored | Status |
-|---|---|---|
-| Jobs | MongoDB via Mongoose | Connected and working |
-| Users | `db.json` via json-server | **Not in MongoDB, no Mongoose model** |
-| Reviews | `db.json` via json-server | **Not in MongoDB, no Mongoose model** |
-
-### Auth Flow (Current Reality)
-```
-Browser → http://localhost:3000/users?email=X  (json-server)
-       ← Array of users returned with plaintext passwords
-Browser compares passwords locally
-User object (including password) stored in localStorage
-```
-There is no JWT, no session, no backend auth middleware.
+### Topology / hygiene
+- [x] **Single-backend topology** — Express + MongoDB on `:5000`. Zero references to `localhost:3000` and zero direct `axios.*` calls outside `api.ts`. *(live + grep)*
+- [x] **Environment hygiene** — `backend/.env` holds `MONGODB_URI`, `PORT`, `JWT_SECRET`, `CSRF_SECRET`, `CLIENT_ORIGIN`, loaded via `import 'dotenv/config'`. `.env` is gitignored; `.env.example` keeps the keys. *(static)*
+- [x] **Credentialed CORS** — `cors({ origin: CLIENT_ORIGIN, credentials: true })`. Wildcard origin is forbidden with credentials, so the dev origin (`localhost:5173`) is explicit. *(live)*
+- [x] **Frontend type contract centralised** — `frontend/src/types/index.ts` defines `Job`, `Bid`, `User` with the new shape; views import from there. *(static)*
+- [x] **Seed script** — `npm run seed` in `backend/` drops the DB and inserts one client + one worker + one open job. Reuses `usersService.createUser` so bcrypt path matches login. *(live)*
 
 ---
 
-## 3. Blue-Collar Feature Gaps
+## ⚠️ Soft
 
-The following features are standard expectations for a field-worker job platform and are **entirely absent**:
+Cosmetic UI gating only — server enforcement now covers all mutating endpoints (Tier 2). These items hide controls in the UI but don't add security; a direct URL still works for *viewing* if the user is logged in.
 
-### Critical for Field Workers
-- **Offline support / PWA** — workers in the field have unreliable connectivity; no service worker, no caching, no offline queue
-- **Photo uploads** — workers need to attach job completion photos; no file upload anywhere
-- **Map / location integration** — no geocoding, no map view, location is a free-text string with zero validation
-- **Push notifications** — no way to alert a worker when a job becomes available or is assigned
-- **Job scheduling / calendar** — no date/time on jobs, no scheduling view
-
-### Important for Business Logic
-- **Job filtering and search** — no filter by type, location, price, availability; full list loads every time
-- **Worker profiles** — skills exist in `db.json` but are never displayed or used in matching
-- **Ratings and reviews flow** — `JobReviews.vue` exists as a stub but there's no submit form, no API endpoint, and it's never shown
-- **Job status lifecycle** — only two states (`taken: true/false`); no pending, in-progress, completed, disputed
-
-### Nice-to-Have
-- Admin panel / moderation
-- Messaging / chat between worker and client
-- Payment integration
-- PDF job receipts / invoices
-- Multi-language support (UI is Serbian-only)
+- [x] **Vue Router auth guards** — `requiresAuth` still consults the localStorage cache for instant gating to avoid a redirect flash. Real enforcement is `requireAuth` on the server. *(static, cosmetic)*
+- [x] **NavBar role visibility** — "Postavi posao" only renders for `user?.role === 'client'`; `/jobs` link label switches by role. Cosmetic. *(static)*
+- [x] **JobsTable `canBid` gating** — button hidden unless `role === 'worker'` AND `job.userId !== currentUserId` AND `job.status === 'open'`. Cosmetic. *(static)*
+- [x] **JobBidsView `canAccept` gating** — "Prihvati" button hidden unless `currentUser.id === job.userId` AND `bid.status === 'pending'` AND `job.status === 'open'`. Cosmetic. *(static)*
 
 ---
 
-## 4. Quick Wins & Technical Debt
+## ❌ Broken
 
-### Fix Immediately (before new features)
-
-**Broken / Incorrect**
-- [x] `LoginView.vue` and `RegisterView.vue` hardcode `http://localhost:3000/users` — must be updated to use the centralized `api.ts` (port 5000), and a real `/users` endpoint must be added to Express
-- [ ] `api.ts` exports `getJobById()` and `getTakenJobs()` — these call endpoints (`/jobs/:id`, `/jobs?taken=true`) that **do not exist** on the Express backend *(baseURL now correct, but the endpoints themselves still need to be added)*
-- [x] `auth.service.ts` queries `/users` directly — this endpoint does not exist on Express
-
-**Security**
-- [x] Passwords stored in plaintext in `db.json` and compared client-side — critical *(now bcrypt-hashed in MongoDB)*
-- [ ] No auth middleware on Express — any unauthenticated request can create or modify jobs *(deferred to Phase 1 — JWT)*
-- [ ] No input validation on `POST /api/jobs` — malformed data goes straight to MongoDB *(deferred to Phase 1 — Zod)*
-
-**Configuration**
-- [x] `dotenv` is installed but `require('dotenv').config()` is never called in `app.ts`
-- [x] MongoDB URI is hardcoded in `config/db.ts` — should be `process.env.MONGODB_URI`
-- [x] No `.env` files exist for either service
-
-### Clean Up (technical debt)
-
-**Dead Code**
-- [x] `frontend/src/data/jobsData.ts` — never imported anywhere, delete it
-- [ ] Vuex store is set up but no state is actually stored in it — either use it or remove it
-
-**Data Model Gaps**
-- [x] `Job` model missing `timestamps` (`createdAt`, `updatedAt`) and `userId` field in Mongoose schema
-- [x] No Mongoose model for `User` — required before auth can be moved to Express
-- [ ] No Mongoose model for `Review`
-
-**Consistency**
-- [ ] Views (`HomeView`, `JobsView`) call `api.getJobs()` directly — should use `JobsService` for consistency
-- [ ] `jobs.service.ts` `startPolling()` is implemented but never called — wire it up or remove it
-
-**Backend Missing Basics**
-- [ ] No `DELETE /api/jobs/:id` endpoint
-- [ ] No `GET /api/jobs/:id` endpoint
-- [ ] No pagination on `GET /api/jobs`
-- [ ] No error logging (errors silently return generic 500 messages)
-- [ ] No security headers (no `helmet`)
+Nothing currently broken.
 
 ---
 
-## Priority Roadmap (Suggested Order)
+## 🟡 Missing
 
-```
-Phase 0 — Stabilize (fix broken things, no new features)
-  1. Add .env files, wire up dotenv
-  2. Fix LoginView/RegisterView base URL
-  3. Add User Mongoose model + POST /api/users, POST /api/auth/login endpoints
-  4. Add timestamps + userId to Job model
-  5. Delete dead code (jobsData.ts)
+Features the app should have but doesn't.
 
-Phase 1 — Security Foundation
-  1. Hash passwords (bcrypt)
-  2. Implement JWT auth (login → token → middleware on all write endpoints)
-  3. Add input validation (Zod on backend)
+### Security (Tier 2 — shipped, follow-ups)
+- [ ] **Refresh tokens** — current JWT is access-only (7-day expiry, no rotation). Locked decision; revisit with real users.
+- [ ] **Helmet / rate-limiting / security headers** — not in the Tier 2 scope; separate hardening pass.
+- [ ] **Production secrets** — `.env` ships with dev placeholders for `JWT_SECRET` / `CSRF_SECRET`. Must be replaced before any non-local deploy.
 
-Phase 2 — Feature Completeness
-  1. Job filtering/search
-  2. Job status lifecycle
-  3. Reviews flow (POST /api/reviews, wire JobReviews component)
-  4. Worker profiles
+### Bidding polish
+- [ ] **Bid editability** — workers can't update their `amount`/`message` before the client accepts (open question in [[project-plan]]).
+- [ ] **Bid expiry** — no expiry; pending bids live forever if the client never accepts.
+- [ ] **Concurrent-accept protection** — `acceptBid` does 3 sequential updates, no transaction. Two simultaneous accepts on different bids would race; last write wins. Acceptable for now ([[project-plan]] Tier 3).
 
-Phase 3 — Blue-Collar Essentials
-  1. Photo uploads (Multer / S3)
-  2. Location with map (Leaflet or Google Maps)
-  3. Push notifications
-  4. PWA / offline support
-```
+### Domain completeness (Tier 3)
+- [ ] **`Review` Mongoose model + endpoints** — `JobReviews.vue` exists as an orphaned stub.
+- [ ] **Job filtering / search** — `GET /api/jobs` returns everything; no filters server-side.
+- [ ] **Job lifecycle beyond `assigned`** — enum includes `completed` and `closed` but no UI transitions yet.
+- [ ] **Worker profile pages** — `skills[]` collected at registration but never displayed.
+
+### Blue-collar essentials (Tier 4)
+- [ ] **Photo uploads** on job posts.
+- [ ] **Map / geocoded location** — `location` is a free-text string.
+- [ ] **PWA / offline support** — no service worker.
+- [ ] **Push notifications** — no notification channel.
+
+### Polish
+- [ ] **Inconsistent error language** — most messages are Serbian, but a few (`Server error`, `Invalid job data`, `Invalid bid data`) remain English.
+- [ ] **`DELETE /api/jobs/:id`** endpoint doesn't exist.
+- [ ] **About / Contact pages** are placeholder stubs.
+- [ ] **`frontend/src/services/jobs.service.ts`** — still unused by views (its `getAllJobs` + `startPolling` survive; stale take-job methods deleted). Decide: wire it up or remove.
 
 ---
 
 ## Links
 
-- [[marketplace-loop]] — what the marketplace loop is (post → take → display)
-- [[index]] — codebase structure map
-- [[project-overview]] — architecture and endpoint reference
-- [[phase-0-review]] — post-Phase-0 verification + recommendations for what to tackle next
+- [[index]] — file map + note index
+- [[project-overview]] — architecture, endpoints, data models, marketplace loop
+- [[project-plan]] — prioritized roadmap (where these gaps get scheduled)
+- [[worklog]] — chronological history

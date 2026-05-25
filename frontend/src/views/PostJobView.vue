@@ -101,16 +101,7 @@ const handleSubmit = async () => {
     loading.value = true
     error.value = ''
 
-    const currentUser = authService.getCurrentUser()
-    if (!currentUser?.id) {
-      throw new Error('Niste prijavljeni')
-    }
-
-    await addJob({
-      ...form.value,
-      userId: currentUser.id,
-      role: currentUser.role
-    })
+    await addJob({ ...form.value })
 
     router.push('/')
 

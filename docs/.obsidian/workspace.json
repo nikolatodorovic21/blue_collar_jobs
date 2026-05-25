@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "project-overview.md",
+                "file": "project-plan.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "project-overview"
+              "title": "project-plan"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "project-overview.md",
+                "file": "project-plan.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for project-overview"
+              "title": "Backlinks for project-plan"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "project-overview.md",
+                "file": "project-plan.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from project-overview"
+              "title": "Outgoing links from project-plan"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "project-overview.md",
+                "file": "project-plan.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of project-overview"
+              "title": "Outline of project-plan"
             }
           }
         ]
@@ -180,25 +180,48 @@
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
       "command-palette:Open command palette": false,
-      "bases:Create new base": false
+      "bases:Create new base": false,
+      "templater-obsidian:Templater": false,
+      "obsidian-kanban:Create new board": false
     }
   },
   "active": "66eacfb12d5a402e",
   "lastOpenFiles": [
-    "project-overview.md",
-    "phase-0-review.md",
-    "marketplace-loop.md",
-    "index.md",
+    "02-skills/error-responses.md",
+    "02-skills/authorization-and-identity.md",
+    "01-decisions/008-seed-script-inside-src.md",
     "app-state-audit.md",
-    "app-state-audit.md.tmp.25040.a22b761ed09f",
-    "index.md.tmp.25040.893b1575c358",
-    "index.md.tmp.25040.d2b8c38279db",
-    "phase-0-review.md.tmp.25040.f58e193e19d1",
-    "project-overview.md.tmp.25040.37242d06e02a",
-    "marketplace-loop.md.tmp.25040.9d83afa5767a",
-    "index.md.tmp.25040.77f304d867be",
-    "index.md.tmp.25040.03f9ae5ca5dc",
-    "index.md.tmp.25040.dc6161abff61",
-    "project-overview.md.tmp.25040.bcbef8b249f0"
+    "index.md",
+    "project-overview.md",
+    "project-plan.md",
+    "worklog.md",
+    "raw/obsidian.md",
+    "02-skills/error-responses.md.tmp.24792.c92cfb8ccc74",
+    "02-skills/error-responses.md.tmp.24792.914cf17a431d",
+    "02-skills/authorization-and-identity.md.tmp.24792.66c012a9e1e7",
+    "02-skills/authorization-and-identity.md.tmp.24792.17def92876e8",
+    "01-decisions/001-no-jwt-until-tier-2.md",
+    "01-decisions/002-jwt-in-httponly-cookie.md",
+    "project-plan.md.tmp.24792.2f97e02a14a4",
+    "project-plan.md.tmp.24792.edcf08e55619",
+    "index.md.tmp.24792.c0a6f9592e57",
+    "02-skills/serbian-user-facing-messages.md",
+    "02-skills/serbian-user-facing-messages.md.tmp.24792.7b3cfef2d456",
+    "02-skills/error-responses.md.tmp.24792.a59f1907681c",
+    "02-skills/zod-validation.md",
+    "02-skills/zod-validation.md.tmp.24792.dac65a3bf4ab",
+    "02-skills/layered-architecture.md",
+    "02-skills/skills-framework.md",
+    "01-decisions/007-access-token-only-no-refresh.md",
+    "01-decisions/006-csrf-csrf-double-submit.md",
+    "01-decisions/005-service-layer.md",
+    "01-decisions/004-tech-stack-locked.md",
+    "01-decisions/003-bidding-replaces-take-job.md",
+    "raw/skills.md",
+    "raw/grokPoboljsanja.md",
+    "wiki/skills.md",
+    "raw.md",
+    "marketplace-loop.md",
+    "Untitled.canvas"
   ]
 }
