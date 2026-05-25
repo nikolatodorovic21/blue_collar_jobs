@@ -16,8 +16,10 @@
           <li class="nav-item">
             <router-link to="/" class="nav-link" active-class="active">Početna</router-link>
           </li>
-          <li class="nav-item">
-            <router-link to="/jobs" class="nav-link" active-class="active">Poslovi</router-link>
+          <li v-if="user" class="nav-item">
+            <router-link to="/jobs" class="nav-link" active-class="active">
+              {{ user.role === 'worker' ? 'Moje ponude' : 'Moji poslovi i ponude' }}
+            </router-link>
           </li>
           <li v-if="user?.role === 'client'" class="nav-item">
             <router-link to="/post-job" class="nav-link" active-class="active">Postavi posao</router-link>
@@ -47,11 +49,11 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { authService } from '@/services/auth.service';
 
 interface User {
   id: string;
   name: string;
-  email: string;
   role: 'worker' | 'client';
 }
 
@@ -63,8 +65,7 @@ export default defineComponent({
 
     // Funkcija za čitanje korisnika iz localStorage
     const readUserFromStorage = (): User | null => {
-      const userData = localStorage.getItem('user');
-      return userData ? JSON.parse(userData) : null;
+      return authService.getCurrentUser() as User | null;
     };
 
     // Osvežava korisničke podatke
@@ -95,8 +96,8 @@ export default defineComponent({
       window.removeEventListener('storage', storageEventListener);
     });
 
-    const logout = () => {
-      localStorage.removeItem('user');
+    const logout = async () => {
+      await authService.logout();
       user.value = null;
       router.push('/login');
     };

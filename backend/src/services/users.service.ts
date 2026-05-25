@@ -12,3 +12,7 @@ export const createUser = async (data: IUser) => {
 export const findUserByEmail = async (email: string) => {
   return await User.findOne({ email: email.toLowerCase() });
 };
+
+export const findUserById = async (id: string) => {
+  return await User.findById(id);
+};

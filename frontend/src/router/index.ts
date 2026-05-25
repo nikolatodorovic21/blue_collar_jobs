@@ -6,6 +6,9 @@ import JobsView from '@/views/JobsView.vue'
 import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import PostJobView from '@/views/PostJobView.vue'
+import JobBidsView from '@/views/JobBidsView.vue'
+import { setUnauthorizedHandler } from '@/services/api'
+import { authService } from '@/services/auth.service'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -35,6 +38,12 @@ const router = createRouter({
       meta: { title: 'Moji Poslovi', requiresAuth: true }
     },
     {
+      path: '/jobs/:id/bids',
+      name: 'job-bids',
+      component: JobBidsView,
+      meta: { title: 'Ponude na posao', requiresAuth: true }
+    },
+    {
       path: '/post-job',
       name: 'post-job',
       component: PostJobView,
@@ -50,18 +59,25 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: RegisterView,
-     meta: { guestOnly: true }
-  }
+      meta: { guestOnly: true }
+    }
   ]
 })
 
+setUnauthorizedHandler(() => {
+  authService.clearLocalCache()
+  if (router.currentRoute.value.name !== 'login') {
+    router.push('/login')
+  }
+})
+
 router.beforeEach((to) => {
-  const user = JSON.parse(localStorage.getItem('user') || 'null')
-  
+  const user = authService.getCurrentUser()
+
   if (to.meta.requiresAuth && !user) {
     return '/login'
   }
-  
+
   if (to.meta.guestOnly && user) {
     return '/'
   }

@@ -1,121 +1,126 @@
-# Codebase Index
+---
+title: Index
+type: index
+status: living
+updated: 2026-05-25c
+---
 
-> Quick-reference map of the Poslovi project. See [[project-overview]] for full details. New to the codebase? Start with [[marketplace-loop]].
+# Index
+
+> The map. Use this to find your way around the codebase and the vault. **New here?** Read [[project-overview]] for architecture and [[app-state-audit]] for current state.
+
+**Tech stack at a glance:** Vue 3 + Vite + TS (frontend) / Express 5 + Mongoose + MongoDB (backend) / one server on `:5000`. Full table in [[project-overview]].
 
 ---
 
-## Structure
+## Notes in this vault
+
+| Note | Purpose | When to read |
+|---|---|---|
+| [[index]] | This file. Codebase map + note index. | First, when you're new. |
+| [[project-overview]] | Architecture, tech stack, API endpoints, data models, frontend routes, marketplace loop. The reference. | When you need to know how something is wired or what an endpoint expects. |
+| [[app-state-audit]] | Current factual state — works / soft / broken / missing. Living checkboxes. | When you need to know what's true today. |
+| [[project-plan]] | Prioritized roadmap. Bidding pivot, tiers, open questions. | When deciding what to do next. |
+| [[worklog]] | Append-only session log. Newest at top. | When you want to know what happened, when, and why. |
+
+## Folders
+
+| Folder | Holds | Read when… |
+|---|---|---|
+| [01-decisions/](01-decisions/) | Architecture Decision Records (ADRs) — one note per significant decision, with Context / Decision / Consequences. Numbered `NNN-kebab-title.md`. | Investigating *why* something is the way it is; before proposing a change that would contradict a past decision. |
+| [02-skills/](02-skills/) | Coding standards the codebase **actually follows** right now. [[skills-framework]] indexes them. | Before adding a new endpoint, schema, or feature — match the existing grain. |
+
+---
+
+## Codebase structure
 
 ```
 poslovi/
 ├── backend/
-│   ├── .env                    ← MONGODB_URI, PORT (gitignored)
+│   ├── .env                    ← MONGODB_URI, PORT, JWT_SECRET, CSRF_SECRET, CLIENT_ORIGIN (gitignored)
 │   ├── .env.example
 │   └── src/
-│       ├── app.ts              ← Express entry point (port 5000)
+│       ├── app.ts              ← Express entry (port 5000) + cookie/CSRF/CORS wiring
 │       ├── config/
 │       │   └── db.ts           ← MongoDB connection (reads env)
+│       ├── types/
+│       │   └── express.d.ts    ← req.user = { id, role } augmentation
+│       ├── middleware/
+│       │   ├── requireAuth.ts  ← jwt.verify → req.user
+│       │   ├── requireRole.ts  ← factory: requireRole('client'|'worker')
+│       │   ├── validate.ts     ← Zod factory
+│       │   └── csrf.ts         ← csrf-csrf double-submit
+│       ├── schemas/
+│       │   ├── auth.schema.ts  ← loginSchema, registerSchema (.strict)
+│       │   ├── job.schema.ts   ← createJobSchema
+│       │   └── bid.schema.ts   ← submitBidSchema
 │       ├── models/
-│       │   ├── job.model.ts    ← Mongoose Job schema (timestamps + userId)
-│       │   └── user.model.ts   ← Mongoose User schema (bcrypt hash)
+│       │   ├── job.model.ts    ← Job: status + userId (poster) + assignedWorkerId
+│       │   ├── bid.model.ts    ← Bid: jobId, workerId, amount, message, status
+│       │   └── user.model.ts   ← User: bcrypt hash + role enum
 │       ├── routes/
-│       │   ├── jobs.routes.ts
-│       │   ├── users.routes.ts ← POST /api/users (register)
-│       │   └── auth.routes.ts  ← POST /api/auth/login
+│       │   ├── jobs.routes.ts  ← GET /:id, POST / (auth+client), GET /:id/bids (auth), POST /:id/bids (auth+worker)
+│       │   ├── bids.routes.ts  ← GET / (auth+worker), PATCH /:id/accept (auth+client)
+│       │   ├── users.routes.ts ← POST /api/users + Zod
+│       │   └── auth.routes.ts  ← POST /login, POST /logout, GET /me
 │       ├── controllers/
-│       │   ├── jobs.controller.ts
-│       │   ├── users.controller.ts
-│       │   └── auth.controller.ts
-│       └── services/
-│           ├── jobs.service.ts
-│           ├── users.service.ts  ← createUser (hashes), findUserByEmail
-│           └── auth.service.ts   ← login (bcrypt.compare)
+│       │   ├── jobs.controller.ts   ← addJob uses req.user.id
+│       │   ├── bids.controller.ts   ← submit/get/accept all use req.user; getBidsForJob filters by ownership
+│       │   ├── users.controller.ts  ← register issues JWT + CSRF (auto-login)
+│       │   └── auth.controller.ts   ← login/logout/me; issues + clears the JWT cookie
+│       ├── services/
+│       │   ├── jobs.service.ts      ← getAllJobs, getJobById, createJob
+│       │   ├── bids.service.ts      ← createBid, listBidsForJob, listBidsForJobByWorker, listBidsForWorker, acceptBid
+│       │   ├── users.service.ts     ← createUser, findUserByEmail, findUserById
+│       │   ├── auth.service.ts      ← login (bcrypt.compare), AuthError
+│       │   └── token.service.ts     ← signAuthToken, setAuthCookie, clearAuthCookie
+│       └── scripts/
+│           └── seed.ts              ← npm run seed → wipe + insert client/worker/job
 ├── frontend/
 │   └── src/
-│       ├── main.ts             ← Vue app entry
+│       ├── main.ts
+│       ├── types/
+│       │   └── index.ts        ← Job, Bid, User, JobStatus, BidStatus
 │       ├── router/
-│       │   └── index.ts        ← Routes + auth guards
+│       │   └── index.ts        ← Routes + auth guards (incl. /jobs/:id/bids)
 │       ├── services/
-│       │   ├── api.ts          ← Axios instance (baseURL :5000/api)
-│       │   ├── jobs.service.ts
+│       │   ├── api.ts          ← Axios instance; bid + job endpoints
+│       │   ├── jobs.service.ts ← currently unused by views
 │       │   └── auth.service.ts ← login + register via api.ts
-│       ├── views/              ← Page components (7, incl. PostJobView.vue)
-│       └── components/         ← Reusable UI (3)
-├── docs/                       ← This Obsidian vault
-└── db.json                     ← Sample data reference (no longer served)
+│       ├── views/              ← HomeView, JobsView (role-aware), JobBidsView,
+│       │                         PostJobView, LoginView, RegisterView, About, Contact
+│       └── components/         ← NavBar, JobsTable (with bid modal), JobReviews (stub)
+├── docs/                       ← This Obsidian vault (gitignored)
+├── CLAUDE.md                   ← Claude working memory (gitignored)
+└── db.json                     ← Sample data reference (not served, schema-stale)
 ```
 
 ---
 
-## Tech Stack
+## Quick links into the code
 
-| Layer | Tech | Version |
-|---|---|---|
-| Backend framework | Express | 5.1 |
-| Backend language | TypeScript | 6.0 |
-| ODM | Mongoose | 8.15 |
-| Database | MongoDB | local |
-| Frontend framework | Vue | 3.5 |
-| Build tool | Vite | 6.2 |
-| State | Vuex | 4.0 |
-| Router | Vue Router | 4.5 |
-| HTTP client | Axios | 1.9 |
-| UI | Bootstrap | 5.3 |
-
----
-
-## API Endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/jobs` | All jobs |
-| `POST` | `/api/jobs` | Create job (soft: requires `role=client` in body) |
-| `PATCH` | `/api/jobs/:id` | Mark as taken (soft: requires `role=worker`, blocks self-take) |
-| `POST` | `/api/users` | Register (bcrypt) |
-| `POST` | `/api/auth/login` | Login (bcrypt.compare) |
-
----
-
-## Data Models
-
-### Job *(Mongoose)*
-`type · price · location · description · taken · userId?(ObjectId→User) · createdAt · updatedAt`
-
-### User *(Mongoose)*
-`email · password(bcrypt hash) · name · role(worker|client) · skills[] · address? · createdAt · updatedAt`
-
-### Review *(db.json only — no Mongoose model)*
-`id · jobId · userId · rating · comment · createdAt`
-
----
-
-## Frontend Routes
-
-| Path | View | Guard |
-|---|---|---|
-| `/` | HomeView | requiresAuth |
-| `/jobs` | JobsView | requiresAuth |
-| `/post-job` | PostJobView | requiresAuth + in-view client-only |
-| `/login` | LoginView | guestOnly |
-| `/register` | RegisterView | guestOnly |
-| `/about` | AboutView | requiresAuth |
-| `/contact` | ContactView | requiresAuth |
-
----
-
-## Open Issues
-
-- [x] ~~Port mismatch: `api.ts` points to `:3000`, backend runs on `:5000`~~ — fixed (`:5000/api`)
-- [x] ~~Passwords stored in plaintext in `db.json`~~ — bcrypt-hashed in MongoDB
-- [x] ~~No Mongoose model for User~~ — User model created
-- [ ] No Mongoose model for Review
-- [ ] No server-side authentication (JWT/sessions) — **Phase 1**
+| Where | Why you might want it |
+|---|---|
+| [backend/src/middleware/csrf.ts](../backend/src/middleware/csrf.ts) | `csrf-csrf` config — cookie name, session id, skip rules. |
+| [backend/src/middleware/requireAuth.ts](../backend/src/middleware/requireAuth.ts) | The JWT verify + `req.user` setter. |
+| [backend/src/services/token.service.ts](../backend/src/services/token.service.ts) | Cookie options + JWT signing in one place. |
+| [backend/src/controllers/bids.controller.ts](../backend/src/controllers/bids.controller.ts) | All identity checks now use `req.user`; GET bids filters by ownership. |
+| [backend/src/services/bids.service.ts](../backend/src/services/bids.service.ts) | `acceptBid` — the 3-step accept dance (this/siblings/job). |
+| [backend/src/models/job.model.ts](../backend/src/models/job.model.ts) | Job: status enum + assignedWorkerId. |
+| [backend/src/models/user.model.ts](../backend/src/models/user.model.ts) | `User.role` enum + bcrypt-stripping `toJSON`. |
+| [backend/src/scripts/seed.ts](../backend/src/scripts/seed.ts) | `npm run seed` — wipe + seed entry point. |
+| [frontend/src/services/api.ts](../frontend/src/services/api.ts) | `withCredentials`, CSRF header injection, 401 interceptor. |
+| [frontend/src/services/auth.service.ts](../frontend/src/services/auth.service.ts) | `me()`, `logout()`, slim display cache. |
+| [frontend/src/types/index.ts](../frontend/src/types/index.ts) | Centralised `Job` / `Bid` / `User` types. |
+| [frontend/src/router/index.ts](../frontend/src/router/index.ts) | Auth guards (localStorage cache) + 401 handler. |
+| [frontend/src/views/JobBidsView.vue](../frontend/src/views/JobBidsView.vue) | Client's bid-review + accept UI. |
+| [frontend/src/components/JobsTable.vue](../frontend/src/components/JobsTable.vue) | Bid submit modal + status badges. |
 
 ---
 
 ## Links
 
-- [[marketplace-loop]] — what the app does (post → take → display)
-- [[project-overview]] — full architecture doc
-- [[app-state-audit]] — Phase 0 progress tracker
-- [[phase-0-review]] — post-Option-A status + next-step framing
+- [[project-overview]] — full architecture and reference
+- [[app-state-audit]] — what's true right now
+- [[project-plan]] — what's next
+- [[worklog]] — what happened
