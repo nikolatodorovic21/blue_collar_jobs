@@ -1,0 +1,111 @@
+{
+  "jobs": [
+    {
+      "id": "1",
+      "type": "Keramika",
+      "price": 12000,
+      "location": "Novi Beograd",
+      "description": "Postavljanje keramičkih pločica u kupatilu (10m²)",
+      "taken": true,
+      "userId": 2,
+      "createdAt": "2023-11-25"
+    },
+    {
+      "id": "2",
+      "type": "Stolarija",
+      "price": 25000,
+      "location": "Vračar",
+      "description": "Izrada i ugradnja drvenih prozora (3 komada)",
+      "taken": false,
+      "userId": 0,
+      "createdAt": "2023-11-24"
+    },
+    {
+      "id": "3",
+      "type": "Elektrika",
+      "price": 8000,
+      "location": "Zemun",
+      "description": "Zamena osigurača i instalacija novih LED sijalica",
+      "taken": false,
+      "userId": 0,
+      "createdAt": "2023-11-20"
+    },
+    {
+      "id": "4",
+      "type": "Vodoinstalater",
+      "price": 15000,
+      "location": "Savski Venac",
+      "description": "Popravka oštećenog cevovoda u kuhinji",
+      "taken": false,
+      "userId": 0,
+      "createdAt": "2023-11-22"
+    },
+    {
+      "id": "5",
+      "type": "Molerski poslovi",
+      "price": 20000,
+      "location": "Stari Grad",
+      "description": "Krečenje stana (75m²) sa 2 sloja farbe",
+      "taken": false,
+      "userId": 0,
+      "createdAt": "2023-11-18"
+    }
+  ],
+  "users": [
+    {
+      "id": "1",
+      "email": "majstor@example.com",
+      "password": "majstor123",
+      "name": "Petar Petrović",
+      "role": "worker",
+      "skills": [
+        "Keramika",
+        "Stolarija"
+      ]
+    },
+    {
+      "id": "2",
+      "email": "klijent@example.com",
+      "password": "klijent123",
+      "name": "Ana Anić",
+      "role": "client",
+      "address": "Bulevar Kralja Aleksandra 12"
+    },
+    {
+      "id": "78990610533",
+      "name": "hgchgfhg",
+      "email": "proba123@gmail.com",
+      "password": "1234",
+      "role": "client",
+      "skills": []
+    },
+    {
+      "id": "1749042057527",
+      "name": "proba",
+      "email": "proba@gmail.com",
+      "password": "proba123",
+      "role": "client",
+      "skills": []
+    },
+    {
+      "id": "1749407175840",
+      "name": "kneza",
+      "email": "kneza@gmail.com",
+      "password": "kneza123",
+      "role": "worker",
+      "skills": [
+        "Molerski poslovi"
+      ]
+    }
+  ],
+  "reviews": [
+    {
+      "id": "1",
+      "jobId": 3,
+      "userId": 2,
+      "rating": 5,
+      "comment": "Izuzetno profesionalno i kvalitetno odrađen posao!",
+      "createdAt": "2023-11-21"
+    }
+  ]
+}
