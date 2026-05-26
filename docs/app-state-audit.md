@@ -2,7 +2,7 @@
 title: App State Audit
 type: audit
 status: living
-updated: 2026-05-25b
+updated: 2026-05-26
 ---
 
 # App State Audit
@@ -74,7 +74,7 @@ Nothing currently broken.
 
 ## 🟡 Missing
 
-Features the app should have but doesn't.
+Features the app should have but doesn't. **All items below are now scheduled in [[project-plan]]** (Tier 3 / Tier 4 / Tier 5 / Deferred); this section remains as the factual "what's not built" list rather than the to-do list.
 
 ### Security (Tier 2 — shipped, follow-ups)
 - [ ] **Refresh tokens** — current JWT is access-only (7-day expiry, no rotation). Locked decision; revisit with real users.

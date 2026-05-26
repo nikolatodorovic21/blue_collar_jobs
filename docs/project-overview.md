@@ -155,18 +155,18 @@ Files: [JobBidsView.vue](../frontend/src/views/JobBidsView.vue) → [api.ts `acc
 
 ### Error matrix
 
-| Attempt | Status | Message |
-|---|---|---|
-| Mutating request without a valid token cookie | `401` | `Niste prijavljeni` / `Sesija je istekla, prijavite se ponovo` |
-| Mutating request without a valid CSRF token | `403` | `CSRF token nije validan` |
-| Worker calls `POST /api/jobs` | `403` | `Samo klijenti mogu izvršiti ovu radnju` |
-| Non-worker calls `POST /api/jobs/:id/bids` | `403` | `Samo majstori mogu izvršiti ovu radnju` |
-| Worker bids on own job | `403` | `Ne možete dati ponudu na sopstveni posao` |
-| Bid on job where `status !== 'open'` | `409` | `Posao više nije otvoren za ponude` |
-| Non-client calls `PATCH /api/bids/:id/accept` | `403` | `Samo klijenti mogu izvršiti ovu radnju` |
-| Non-owner accepts a bid | `403` | `Samo vlasnik posla može prihvatiti ponudu` |
-| Accept on job where `status !== 'open'` | `409` | `Posao više nije otvoren za ponude` |
-| Zod validation failure | `400` | `Neispravni podaci` + `errors: { field: msg }` |
+| Attempt                                       | Status | Message                                                        |
+| --------------------------------------------- | ------ | -------------------------------------------------------------- |
+| Mutating request without a valid token cookie | `401`  | `Niste prijavljeni` / `Sesija je istekla, prijavite se ponovo` |
+| Mutating request without a valid CSRF token   | `403`  | `CSRF token nije validan`                                      |
+| Worker calls `POST /api/jobs`                 | `403`  | `Samo klijenti mogu izvršiti ovu radnju`                       |
+| Non-worker calls `POST /api/jobs/:id/bids`    | `403`  | `Samo majstori mogu izvršiti ovu radnju`                       |
+| Worker bids on own job                        | `403`  | `Ne možete dati ponudu na sopstveni posao`                     |
+| Bid on job where `status !== 'open'`          | `409`  | `Posao više nije otvoren za ponude`                            |
+| Non-client calls `PATCH /api/bids/:id/accept` | `403`  | `Samo klijenti mogu izvršiti ovu radnju`                       |
+| Non-owner accepts a bid                       | `403`  | `Samo vlasnik posla može prihvatiti ponudu`                    |
+| Accept on job where `status !== 'open'`       | `409`  | `Posao više nije otvoren za ponude`                            |
+| Zod validation failure                        | `400`  | `Neispravni podaci` + `errors: { field: msg }`                 |
 
 ### Try it yourself with curl
 

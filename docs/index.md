@@ -2,7 +2,7 @@
 title: Index
 type: index
 status: living
-updated: 2026-05-25c
+updated: 2026-05-26
 ---
 
 # Index
@@ -29,6 +29,7 @@ updated: 2026-05-25c
 |---|---|---|
 | [01-decisions/](01-decisions/) | Architecture Decision Records (ADRs) — one note per significant decision, with Context / Decision / Consequences. Numbered `NNN-kebab-title.md`. | Investigating *why* something is the way it is; before proposing a change that would contradict a past decision. |
 | [02-skills/](02-skills/) | Coding standards the codebase **actually follows** right now. [[skills-framework]] indexes them. | Before adding a new endpoint, schema, or feature — match the existing grain. |
+| [wiki/](wiki/) | English forward-looking notes — design discussion for Tier 3+ items, open questions, gotchas. Indexed by [[wiki/index]]. To-do tracking lives in [[project-plan]]. | When you want the *why* behind an upcoming feature, or design context the plan doesn't capture. |
 
 ---
 
