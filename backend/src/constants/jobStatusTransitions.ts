@@ -9,7 +9,7 @@ export interface JobStatusTransition {
   requiresReason?: boolean;
 }
 
-export const JOB_STATUSES: readonly JobStatus[] = [
+export const JOB_STATUSES = [
   'open',
   'assigned',
   'in_progress',
@@ -17,7 +17,7 @@ export const JOB_STATUSES: readonly JobStatus[] = [
   'cancelled',
   'closed',
   'disputed'
-] as const;
+] as const satisfies readonly JobStatus[];
 
 export const JOB_STATUS_TRANSITIONS: readonly JobStatusTransition[] = [
   { from: 'open', to: 'assigned', actor: 'client' },

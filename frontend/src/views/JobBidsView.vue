@@ -3,7 +3,7 @@
     <p v-if="loading">Učitavanje...</p>
 
     <template v-else-if="job">
-      <h1>Ponude na posao: {{ job.type }}</h1>
+      <h1>Ponude na posao: {{ jobTypeLabel(job.type) }}</h1>
       <p class="text-muted">
         {{ job.location }} — orijentaciona cena {{ job.price }} RSD
         <span :class="jobStatusBadge(job.status)" style="margin-left: 8px">
@@ -120,7 +120,7 @@
 
       <ReviewModal
         v-if="reviewModalOpen"
-        :job-type="job.type"
+        :job-type="jobTypeLabel(job.type)"
         :reviewee-name="otherPartyName"
         :submitting="reviewSubmitting"
         :error="reviewError"
@@ -155,6 +155,7 @@ import {
 } from '@/utils/statusLabels'
 import StatusReasonModal from '@/components/StatusReasonModal.vue'
 import ReviewModal from '@/components/ReviewModal.vue'
+import { jobTypeLabel } from '@/constants/jobTypes'
 
 const route = useRoute()
 const currentUser = ref(authService.getCurrentUser())

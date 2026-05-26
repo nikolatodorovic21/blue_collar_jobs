@@ -1,7 +1,41 @@
+import { Types } from 'mongoose';
 import { Job, IJob, JobStatus } from '../models/job.model';
+import { JobType } from '../constants/jobTypes';
 import { findTransition } from '../constants/jobStatusTransitions';
 import { cascadePendingBidsToExpired } from './bids.service';
 import { ConflictError, ForbiddenError, NotFoundError } from '../errors';
+
+const escapeRegex = (s: string): string =>
+  s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const encodeCursor = (createdAt: Date, id: Types.ObjectId): string =>
+  Buffer.from(
+    JSON.stringify({ c: createdAt.toISOString(), i: id.toString() })
+  ).toString('base64');
+
+export class InvalidCursorError extends Error {
+  constructor() {
+    super('Nevažeći cursor');
+    this.name = 'InvalidCursorError';
+  }
+}
+
+const decodeCursor = (cursor: string): { c: Date; i: Types.ObjectId } => {
+  try {
+    const raw = Buffer.from(cursor, 'base64').toString('utf8');
+    const parsed = JSON.parse(raw) as { c: string; i: string };
+    if (typeof parsed.c !== 'string' || typeof parsed.i !== 'string') {
+      throw new InvalidCursorError();
+    }
+    const c = new Date(parsed.c);
+    if (Number.isNaN(c.getTime())) throw new InvalidCursorError();
+    if (!Types.ObjectId.isValid(parsed.i)) throw new InvalidCursorError();
+    return { c, i: new Types.ObjectId(parsed.i) };
+  } catch (err) {
+    if (err instanceof InvalidCursorError) throw err;
+    throw new InvalidCursorError();
+  }
+};
 
 export const sweepExpiredJobs = async () => {
   const now = new Date();
@@ -19,9 +53,61 @@ export const sweepExpiredJobs = async () => {
   }
 };
 
-export const getAllJobs = async () => {
+export interface ListJobsQuery {
+  type?: JobType;
+  location?: string;
+  priceMin?: number;
+  priceMax?: number;
+  status?: JobStatus;
+  limit: number;
+  cursor?: string;
+}
+
+export interface ListJobsResult {
+  items: IJob[];
+  nextCursor: string | null;
+}
+
+export const listJobs = async (query: ListJobsQuery): Promise<ListJobsResult> => {
   await sweepExpiredJobs();
-  return await Job.find();
+
+  const filter: Record<string, unknown> = {};
+  if (query.type) filter.type = query.type;
+  if (query.status) filter.status = query.status;
+  if (query.location) {
+    filter.location = { $regex: escapeRegex(query.location), $options: 'i' };
+  }
+  if (query.priceMin != null || query.priceMax != null) {
+    const range: Record<string, number> = {};
+    if (query.priceMin != null) range.$gte = query.priceMin;
+    if (query.priceMax != null) range.$lte = query.priceMax;
+    filter.price = range;
+  }
+
+  if (query.cursor) {
+    const { c, i } = decodeCursor(query.cursor);
+    filter.$or = [
+      { createdAt: { $lt: c } },
+      { createdAt: c, _id: { $lt: i } }
+    ];
+  }
+
+  const docs = await Job.find(filter)
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(query.limit + 1);
+
+  let nextCursor: string | null = null;
+  let items = docs;
+  if (docs.length > query.limit) {
+    items = docs.slice(0, query.limit);
+    const last = items[items.length - 1] as unknown as {
+      createdAt: Date;
+      _id: Types.ObjectId;
+    };
+    nextCursor = encodeCursor(last.createdAt, last._id);
+  }
+
+  return { items, nextCursor };
 };
 
 export const getJobById = async (id: string) => {

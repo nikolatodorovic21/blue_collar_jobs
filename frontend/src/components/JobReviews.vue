@@ -28,6 +28,7 @@
 import type { PropType } from 'vue'
 import type { Review } from '@/types'
 import { formatDate } from '@/utils/format'
+import { jobTypeLabel } from '@/constants/jobTypes'
 
 defineProps({
   reviews: {
@@ -43,7 +44,7 @@ const reviewerId = (r: Review): string | null =>
   typeof r.reviewerId === 'object' ? r.reviewerId.id : r.reviewerId || null
 
 const jobType = (r: Review) =>
-  typeof r.jobId === 'object' ? r.jobId.type : '—'
+  typeof r.jobId === 'object' ? jobTypeLabel(r.jobId.type) : '—'
 
 const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n))
 </script>

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { EstimatedDuration, JobStatus } from '@/types'
+import type { EstimatedDuration, Job, JobStatus, JobType } from '@/types'
 
 const api = axios.create({
   baseURL: 'http://localhost:5000/api',
@@ -42,9 +42,24 @@ api.interceptors.response.use(
 )
 
 // Job endpoints
-export const getJobs = () => api.get('/jobs')
+export interface GetJobsQuery {
+  type?: JobType
+  location?: string
+  priceMin?: number
+  priceMax?: number
+  status?: JobStatus
+  limit?: number
+  cursor?: string
+}
+export interface GetJobsResponse {
+  items: Job[]
+  nextCursor: string | null
+}
+
+export const getJobs = (params?: GetJobsQuery) =>
+  api.get<GetJobsResponse>('/jobs', { params })
 export const getJobById = (id: string) => api.get(`/jobs/${id}`)
-export const addJob = (jobData: { type: string; price: number; location: string; description: string }) =>
+export const addJob = (jobData: { type: JobType; price: number; location: string; description: string }) =>
   api.post('/jobs', jobData)
 
 export const updateJobStatus = (

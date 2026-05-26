@@ -12,7 +12,7 @@
       </thead>
       <tbody>
         <tr v-for="job in jobs" :key="job.id">
-          <td>{{ job.type }}</td>
+          <td>{{ jobTypeLabel(job.type) }}</td>
           <td>{{ job.price }} RSD</td>
           <td>{{ job.location }}</td>
           <td>
@@ -108,6 +108,7 @@
 import { computed, defineComponent, PropType, ref } from 'vue'
 import type { DurationUnit, Job } from '@/types'
 import { jobStatusBadge, jobStatusLabel } from '@/utils/statusLabels'
+import { jobTypeLabel } from '@/constants/jobTypes'
 
 export default defineComponent({
   name: 'JobsTable',
@@ -219,6 +220,7 @@ export default defineComponent({
       canCancelOpen,
       jobStatusLabel,
       jobStatusBadge,
+      jobTypeLabel,
       openBidModal,
       closeBidModal,
       submitBidForm

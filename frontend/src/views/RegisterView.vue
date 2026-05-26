@@ -52,16 +52,12 @@
               </div>
               <div v-if="form.role === 'worker'" class="mb-3">
                 <label class="form-label">Vrste usluga (Ctrl+klik za više izbora)</label>
-                <select 
+                <select
                   v-model="form.skills"
-                  class="form-select" 
+                  class="form-select"
                   multiple
                 >
-                  <option value="Keramika">Keramika</option>
-                  <option value="Stolarija">Stolarija</option>
-                  <option value="Elektrika">Elektrika</option>
-                  <option value="Vodoinstalater">Vodoinstalater</option>
-                  <option value="Molerski poslovi">Molerski poslovi</option>
+                  <option v-for="t in JOB_TYPES" :key="t" :value="t">{{ jobTypeLabel(t) }}</option>
                 </select>
               </div>
               <button type="submit" class="btn btn-primary w-100" :disabled="loading">
@@ -89,6 +85,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService, type RegisterData } from '@/services/auth.service'
+import { JOB_TYPES, jobTypeLabel } from '@/constants/jobTypes'
 
 const router = useRouter()
 

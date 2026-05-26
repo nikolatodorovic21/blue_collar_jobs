@@ -7,6 +7,9 @@ export type JobStatus =
   | 'closed'
   | 'disputed'
 
+export type { JobType } from '@/constants/jobTypes'
+import type { JobType } from '@/constants/jobTypes'
+
 export type BidStatus =
   | 'pending'
   | 'accepted'
@@ -23,7 +26,7 @@ export interface EstimatedDuration {
 
 export interface Job {
   id: string
-  type: string
+  type: JobType
   price: number
   location: string
   description: string

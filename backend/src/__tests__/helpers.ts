@@ -84,7 +84,7 @@ export const createJob = async (
   }> = {}
 ) => {
   const body = {
-    type: overrides.type ?? 'Keramika',
+    type: overrides.type ?? 'keramika',
     price: overrides.price ?? 10000,
     location: overrides.location ?? 'Beograd',
     description: overrides.description ?? 'Testni posao'

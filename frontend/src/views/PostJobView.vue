@@ -17,7 +17,7 @@
                   required
                 >
                   <option value="" disabled>Izaberite vrstu</option>
-                  <option v-for="t in jobTypes" :key="t" :value="t">{{ t }}</option>
+                  <option v-for="t in JOB_TYPES" :key="t" :value="t">{{ jobTypeLabel(t) }}</option>
                 </select>
               </div>
               <div class="mb-3">
@@ -74,12 +74,16 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { addJob } from '@/services/api'
 import { authService } from '@/services/auth.service'
+import { JOB_TYPES, jobTypeLabel, type JobType } from '@/constants/jobTypes'
 
 const router = useRouter()
 
-const jobTypes = ['Keramika', 'Stolarija', 'Elektrika', 'Vodoinstalater', 'Molerski poslovi']
-
-const form = ref({
+const form = ref<{
+  type: '' | JobType
+  price: number
+  location: string
+  description: string
+}>({
   type: '',
   price: 0,
   location: '',
@@ -101,7 +105,16 @@ const handleSubmit = async () => {
     loading.value = true
     error.value = ''
 
-    await addJob({ ...form.value })
+    if (!form.value.type) {
+      error.value = 'Izaberite vrstu posla'
+      return
+    }
+    await addJob({
+      type: form.value.type,
+      price: form.value.price,
+      location: form.value.location,
+      description: form.value.description
+    })
 
     router.push('/')
 

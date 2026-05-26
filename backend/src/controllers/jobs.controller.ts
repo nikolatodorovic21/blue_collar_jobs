@@ -1,13 +1,20 @@
 import { Request, Response } from 'express';
 import * as jobService from '../services/jobs.service';
+import { InvalidCursorError } from '../services/jobs.service';
 import { ConflictError, ForbiddenError, NotFoundError } from '../errors';
 import { JobStatus } from '../models/job.model';
+import type { GetJobsQuery } from '../schemas/job.schema';
 
-export const getJobs = async (_req: Request, res: Response): Promise<void> => {
+export const getJobs = async (req: Request, res: Response): Promise<void> => {
   try {
-    const jobs = await jobService.getAllJobs();
-    res.json(jobs);
-  } catch {
+    const query = req.validatedQuery as GetJobsQuery;
+    const result = await jobService.listJobs(query);
+    res.json(result);
+  } catch (err) {
+    if (err instanceof InvalidCursorError) {
+      res.status(400).json({ message: err.message });
+      return;
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };
