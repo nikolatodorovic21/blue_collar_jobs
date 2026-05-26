@@ -75,4 +75,13 @@ export const editBid = (bidId: string, body: Partial<BidPayload>) =>
 export const withdrawBid = (bidId: string) =>
   api.patch(`/bids/${bidId}/withdraw`)
 
+// User profile + reviews
+export const getPublicUser = (id: string) => api.get(`/users/${id}`)
+
+export const createReview = (body: { jobId: string; rating: number; comment?: string }) =>
+  api.post('/reviews', body)
+
+export const listReviews = (userId: string) =>
+  api.get('/reviews', { params: { userId } })
+
 export default api

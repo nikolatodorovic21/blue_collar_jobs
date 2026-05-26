@@ -7,6 +7,7 @@ import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import PostJobView from '@/views/PostJobView.vue'
 import JobBidsView from '@/views/JobBidsView.vue'
+import WorkerProfileView from '@/views/WorkerProfileView.vue'
 import { setUnauthorizedHandler } from '@/services/api'
 import { authService } from '@/services/auth.service'
 
@@ -48,6 +49,12 @@ const router = createRouter({
       name: 'post-job',
       component: PostJobView,
       meta: { title: 'Postavi posao', requiresAuth: true }
+    },
+    {
+      path: '/users/:id',
+      name: 'user-profile',
+      component: WorkerProfileView,
+      meta: { title: 'Profil korisnika' }
     },
     {
       path: '/login',

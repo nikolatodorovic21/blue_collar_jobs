@@ -59,3 +59,22 @@ export interface User {
   skills?: string[]
   address?: string
 }
+
+export interface Review {
+  id: string
+  jobId: string | { id: string; type: string }
+  reviewerId: string | { id: string; name: string; role: 'worker' | 'client' }
+  revieweeId: string
+  rating: number
+  comment: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PublicUser {
+  id: string
+  name: string
+  role: 'worker' | 'client'
+  skills: string[]
+  rating: { average: number | null; count: number }
+}
