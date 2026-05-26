@@ -1,6 +1,13 @@
 import { Schema, Types, model } from 'mongoose';
 
-export type JobStatus = 'open' | 'assigned' | 'completed' | 'closed';
+export type JobStatus =
+  | 'open'
+  | 'assigned'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'closed'
+  | 'disputed';
 
 export interface IJob {
   type: string;
@@ -10,7 +17,13 @@ export interface IJob {
   status?: JobStatus;
   userId?: Types.ObjectId;
   assignedWorkerId?: Types.ObjectId;
+  completedAt?: Date;
+  cancelledAt?: Date;
+  cancelReason?: string;
+  expiresAt?: Date;
 }
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 const jobSchema = new Schema<IJob>(
   {
@@ -20,11 +33,15 @@ const jobSchema = new Schema<IJob>(
     description: { type: String, required: true },
     status: {
       type: String,
-      enum: ['open', 'assigned', 'completed', 'closed'],
+      enum: ['open', 'assigned', 'in_progress', 'completed', 'cancelled', 'closed', 'disputed'],
       default: 'open'
     },
     userId: { type: Schema.Types.ObjectId, ref: 'User' },
-    assignedWorkerId: { type: Schema.Types.ObjectId, ref: 'User' }
+    assignedWorkerId: { type: Schema.Types.ObjectId, ref: 'User' },
+    completedAt: { type: Date },
+    cancelledAt: { type: Date },
+    cancelReason: { type: String },
+    expiresAt: { type: Date, default: () => new Date(Date.now() + THIRTY_DAYS_MS) }
   },
   { timestamps: true }
 );

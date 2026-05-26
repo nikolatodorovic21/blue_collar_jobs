@@ -1,5 +1,25 @@
-export type JobStatus = 'open' | 'assigned' | 'completed' | 'closed'
-export type BidStatus = 'pending' | 'accepted' | 'rejected'
+export type JobStatus =
+  | 'open'
+  | 'assigned'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'closed'
+  | 'disputed'
+
+export type BidStatus =
+  | 'pending'
+  | 'accepted'
+  | 'rejected'
+  | 'withdrawn'
+  | 'expired'
+
+export type DurationUnit = 'hours' | 'days'
+
+export interface EstimatedDuration {
+  value: number
+  unit: DurationUnit
+}
 
 export interface Job {
   id: string
@@ -12,6 +32,10 @@ export interface Job {
   assignedWorkerId?: string | null
   createdAt: string
   updatedAt: string
+  completedAt?: string | null
+  cancelledAt?: string | null
+  cancelReason?: string | null
+  expiresAt?: string | null
 }
 
 export interface Bid {
@@ -23,6 +47,8 @@ export interface Bid {
   status: BidStatus
   createdAt: string
   updatedAt: string
+  proposedDate?: string | null
+  estimatedDuration?: EstimatedDuration | null
 }
 
 export interface User {

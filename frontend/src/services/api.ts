@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { EstimatedDuration, JobStatus } from '@/types'
 
 const api = axios.create({
   baseURL: 'http://localhost:5000/api',
@@ -46,16 +47,32 @@ export const getJobById = (id: string) => api.get(`/jobs/${id}`)
 export const addJob = (jobData: { type: string; price: number; location: string; description: string }) =>
   api.post('/jobs', jobData)
 
-// Bid endpoints
-export const submitBid = (
+export const updateJobStatus = (
   jobId: string,
-  body: { amount: number; message?: string }
-) => api.post(`/jobs/${jobId}/bids`, body)
+  body: { status: JobStatus; reason?: string }
+) => api.patch(`/jobs/${jobId}/status`, body)
+
+// Bid endpoints
+export interface BidPayload {
+  amount: number
+  message?: string
+  proposedDate?: string
+  estimatedDuration?: EstimatedDuration
+}
+
+export const submitBid = (jobId: string, body: BidPayload) =>
+  api.post(`/jobs/${jobId}/bids`, body)
 
 export const getBidsForJob = (jobId: string) => api.get(`/jobs/${jobId}/bids`)
 
 export const getMyBids = () => api.get('/bids')
 
 export const acceptBid = (bidId: string) => api.patch(`/bids/${bidId}/accept`)
+
+export const editBid = (bidId: string, body: Partial<BidPayload>) =>
+  api.patch(`/bids/${bidId}`, body)
+
+export const withdrawBid = (bidId: string) =>
+  api.patch(`/bids/${bidId}/withdraw`)
 
 export default api
