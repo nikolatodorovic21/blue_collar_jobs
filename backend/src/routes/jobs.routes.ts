@@ -1,10 +1,15 @@
 import { Router } from 'express';
-import { getJobs, getJob, addJob } from '../controllers/jobs.controller';
+import {
+  getJobs,
+  getJob,
+  addJob,
+  updateJobStatus
+} from '../controllers/jobs.controller';
 import { submitBid, getBidsForJob } from '../controllers/bids.controller';
 import { requireAuth } from '../middleware/requireAuth';
 import { requireRole } from '../middleware/requireRole';
 import { validate } from '../middleware/validate';
-import { createJobSchema } from '../schemas/job.schema';
+import { createJobSchema, updateJobStatusSchema } from '../schemas/job.schema';
 import { submitBidSchema } from '../schemas/bid.schema';
 
 const router = Router();
@@ -40,5 +45,14 @@ router.post(
 router.get('/:id/bids', requireAuth, (req, res, next) => {
   getBidsForJob(req, res).catch(next);
 });
+
+router.patch(
+  '/:id/status',
+  requireAuth,
+  validate(updateJobStatusSchema),
+  (req, res, next) => {
+    updateJobStatus(req, res).catch(next);
+  }
+);
 
 export default router;

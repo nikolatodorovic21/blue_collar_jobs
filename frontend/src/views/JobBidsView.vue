@@ -6,14 +6,51 @@
       <h1>Ponude na posao: {{ job.type }}</h1>
       <p class="text-muted">
         {{ job.location }} — orijentaciona cena {{ job.price }} RSD
-        <span :class="statusBadge(job.status)" style="margin-left: 8px">
-          {{ statusLabel(job.status) }}
+        <span :class="jobStatusBadge(job.status)" style="margin-left: 8px">
+          {{ jobStatusLabel(job.status) }}
         </span>
       </p>
       <p>{{ job.description }}</p>
 
-      <p v-if="!isOwner" class="text-danger">
-        Niste vlasnik ovog posla — možete videti ponude ali ne možete ih prihvatiti.
+      <p v-if="job.cancelledAt" class="text-danger">
+        Posao je otkazan{{ job.cancelReason ? `: ${job.cancelReason}` : '' }}.
+      </p>
+
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <button
+          v-if="canMarkStarted"
+          class="btn btn-sm btn-primary"
+          :disabled="busy"
+          @click="markStarted"
+        >
+          Označi kao započet
+        </button>
+        <button
+          v-if="canMarkCompleted"
+          class="btn btn-sm btn-success"
+          :disabled="busy"
+          @click="markCompleted"
+        >
+          Označi kao završen
+        </button>
+        <button
+          v-if="canCancelAssigned"
+          class="btn btn-sm btn-outline-danger"
+          @click="openCancel"
+        >
+          Otkaži posao
+        </button>
+        <button
+          v-if="canDispute"
+          class="btn btn-sm btn-outline-warning"
+          @click="openDispute"
+        >
+          Prijavi spor
+        </button>
+      </div>
+
+      <p v-if="!isOwner && !isAssignedWorker" class="text-danger">
+        Niste vlasnik posla niti dodeljeni majstor — možete videti svoju ponudu ali ne i radnje vlasnika.
       </p>
 
       <table v-if="bids.length > 0" class="table">
@@ -21,6 +58,8 @@
           <tr>
             <th>Majstor</th>
             <th>Iznos</th>
+            <th>Datum dolaska</th>
+            <th>Trajanje</th>
             <th>Poruka</th>
             <th>Status</th>
             <th>Akcija</th>
@@ -28,11 +67,16 @@
         </thead>
         <tbody>
           <tr v-for="bid in bids" :key="bid.id">
-            <td>{{ workerName(bid) }}</td>
+            <td>
+              {{ workerName(bid) }}
+              <span v-if="isEdited(bid.createdAt, bid.updatedAt)" class="text-muted ms-1">(uređeno)</span>
+            </td>
             <td>{{ bid.amount }} RSD</td>
+            <td>{{ formatDate(bid.proposedDate) }}</td>
+            <td>{{ formatDuration(bid.estimatedDuration) }}</td>
             <td>{{ bid.message || '—' }}</td>
             <td>
-              <span :class="bidBadge(bid.status)">{{ bidStatusLabel(bid.status) }}</span>
+              <span :class="bidStatusBadge(bid.status)">{{ bidStatusLabel(bid.status) }}</span>
             </td>
             <td>
               <button
@@ -48,6 +92,18 @@
         </tbody>
       </table>
       <p v-else class="text-muted">Još uvek nema ponuda na ovaj posao.</p>
+
+      <StatusReasonModal
+        v-if="reasonModal"
+        :title="reasonModal.title"
+        :placeholder="reasonModal.placeholder"
+        :confirm-label="reasonModal.confirmLabel"
+        :min-length="1"
+        :submitting="busy"
+        :error="reasonError"
+        @confirm="submitReason"
+        @cancel="closeReasonModal"
+      />
     </template>
 
     <p v-else class="text-danger">Posao nije pronađen.</p>
@@ -57,9 +113,22 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getJobById, getBidsForJob, acceptBid } from '@/services/api'
+import {
+  getJobById,
+  getBidsForJob,
+  acceptBid,
+  updateJobStatus
+} from '@/services/api'
 import { authService } from '@/services/auth.service'
-import type { Job, Bid, JobStatus, BidStatus } from '@/types'
+import type { Bid, Job, JobStatus } from '@/types'
+import { formatDate, formatDuration, isEdited } from '@/utils/format'
+import {
+  bidStatusBadge,
+  bidStatusLabel,
+  jobStatusBadge,
+  jobStatusLabel
+} from '@/utils/statusLabels'
+import StatusReasonModal from '@/components/StatusReasonModal.vue'
 
 const route = useRoute()
 const currentUser = ref(authService.getCurrentUser())
@@ -67,36 +136,39 @@ const job = ref<Job | null>(null)
 const bids = ref<Bid[]>([])
 const loading = ref(true)
 const accepting = ref<string | null>(null)
+const busy = ref(false)
 
 const jobId = computed(() => route.params.id as string)
 const isOwner = computed(() => !!job.value && job.value.userId === currentUser.value?.id)
+const isAssignedWorker = computed(
+  () =>
+    !!job.value &&
+    !!job.value.assignedWorkerId &&
+    job.value.assignedWorkerId === currentUser.value?.id
+)
 
 const workerName = (bid: Bid) =>
   typeof bid.workerId === 'object' ? bid.workerId.name : bid.workerId
 
-const statusLabel = (s: JobStatus) =>
-  ({ open: 'Otvoren', assigned: 'Dodeljen', completed: 'Završen', closed: 'Zatvoren' }[s])
-
-const statusBadge = (s: JobStatus) => {
-  const base = 'badge '
-  if (s === 'open') return base + 'bg-warning text-dark'
-  if (s === 'assigned') return base + 'bg-success'
-  if (s === 'completed') return base + 'bg-secondary'
-  return base + 'bg-dark'
-}
-
-const bidStatusLabel = (s: BidStatus) =>
-  ({ pending: 'Na čekanju', accepted: 'Prihvaćena', rejected: 'Odbijena' }[s])
-
-const bidBadge = (s: BidStatus) => {
-  const base = 'badge '
-  if (s === 'accepted') return base + 'bg-success'
-  if (s === 'rejected') return base + 'bg-danger'
-  return base + 'bg-warning text-dark'
-}
-
 const canAccept = (bid: Bid) =>
   isOwner.value && bid.status === 'pending' && job.value?.status === 'open'
+
+const canMarkStarted = computed(
+  () => isAssignedWorker.value && job.value?.status === 'assigned'
+)
+const canMarkCompleted = computed(
+  () => isOwner.value && job.value?.status === 'in_progress'
+)
+const canCancelAssigned = computed(
+  () =>
+    (isOwner.value || isAssignedWorker.value) &&
+    job.value?.status === 'assigned'
+)
+const canDispute = computed(
+  () =>
+    (isOwner.value || isAssignedWorker.value) &&
+    job.value?.status === 'in_progress'
+)
 
 const load = async () => {
   const [jobResp, bidsResp] = await Promise.all([
@@ -119,6 +191,75 @@ const accept = async (bid: Bid) => {
   } finally {
     accepting.value = null
   }
+}
+
+const transition = async (status: JobStatus, reason?: string) => {
+  if (!job.value) return
+  busy.value = true
+  try {
+    await updateJobStatus(job.value.id, { status, reason })
+    await load()
+    closeReasonModal()
+  } catch (err: any) {
+    const msg = err?.response?.data?.message || 'Greška pri promeni statusa.'
+    if (reasonModal.value) {
+      reasonError.value = msg
+    } else {
+      alert(msg)
+    }
+  } finally {
+    busy.value = false
+  }
+}
+
+const markStarted = () => {
+  if (!confirm('Označiti posao kao započet?')) return
+  transition('in_progress')
+}
+
+const markCompleted = () => {
+  if (!confirm('Označiti posao kao završen?')) return
+  transition('completed')
+}
+
+// Reason modal state
+interface ReasonConfig {
+  title: string
+  placeholder: string
+  confirmLabel: string
+  targetStatus: JobStatus
+}
+const reasonModal = ref<ReasonConfig | null>(null)
+const reasonError = ref('')
+
+const openCancel = () => {
+  reasonModal.value = {
+    title: 'Otkaži posao',
+    placeholder: 'Zašto otkazujete posao?',
+    confirmLabel: 'Otkaži posao',
+    targetStatus: 'cancelled'
+  }
+  reasonError.value = ''
+}
+
+const openDispute = () => {
+  reasonModal.value = {
+    title: 'Prijavi spor',
+    placeholder: 'Opišite spor — admin će ga pregledati',
+    confirmLabel: 'Prijavi spor',
+    targetStatus: 'disputed'
+  }
+  reasonError.value = ''
+}
+
+const closeReasonModal = () => {
+  reasonModal.value = null
+  reasonError.value = ''
+}
+
+const submitReason = (reason: string) => {
+  if (!reasonModal.value) return
+  transition(reasonModal.value.targetStatus, reason)
 }
 
 onMounted(async () => {

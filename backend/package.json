@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn src/app.ts",
-    "seed": "ts-node src/scripts/seed.ts"
+    "dev": "ts-node-dev --respawn src/server.ts",
+    "seed": "ts-node src/scripts/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -29,10 +31,14 @@
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/supertest": "^6.0.3",
+    "mongodb-memory-server": "^10.4.3",
     "nodemon": "^3.1.10",
+    "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^2.1.9"
   },
   "compilerOptions": {
     "target": "es6",

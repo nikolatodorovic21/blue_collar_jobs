@@ -1,5 +1,4 @@
 /// <reference path="./types/express.d.ts" />
-import 'dotenv/config';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -7,11 +6,9 @@ import jobsRouter from './routes/jobs.routes';
 import usersRouter from './routes/users.routes';
 import authRouter from './routes/auth.routes';
 import bidsRouter from './routes/bids.routes';
-import { connectDB } from './config/db';
 import { doubleCsrfProtection } from './middleware/csrf';
 
 const app: Express = express();
-const PORT = process.env.PORT || 5000;
 
 app.use(cors({
   origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
@@ -33,12 +30,6 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   }
   console.error(err);
   res.status(500).json({ message: 'Server error' });
-});
-
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
 });
 
 export default app;

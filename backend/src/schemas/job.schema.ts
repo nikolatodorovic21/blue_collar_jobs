@@ -6,3 +6,10 @@ export const createJobSchema = z.object({
   location: z.string().min(1, 'Lokacija je obavezna'),
   description: z.string().min(1, 'Opis je obavezan')
 }).strict();
+
+export const updateJobStatusSchema = z
+  .object({
+    status: z.enum(['in_progress', 'completed', 'cancelled', 'disputed']),
+    reason: z.string().min(1).max(500).optional()
+  })
+  .strict();

@@ -16,23 +16,32 @@
           <td>{{ job.price }} RSD</td>
           <td>{{ job.location }}</td>
           <td>
-            <span :class="statusBadgeClass(job.status)">{{ statusLabel(job.status) }}</span>
+            <span :class="jobStatusBadge(job.status)">{{ jobStatusLabel(job.status) }}</span>
           </td>
           <td>
-            <button
-              v-if="canBid(job)"
-              @click="openBidModal(job)"
-              class="btn btn-sm btn-primary"
-            >
-              Postavi ponudu
-            </button>
-            <button
-              v-else-if="showBidsLink && job.userId === currentUserId"
-              @click="$emit('view-bids', job.id)"
-              class="btn btn-sm btn-outline-primary"
-            >
-              Vidi ponude
-            </button>
+            <div class="d-flex flex-wrap gap-2">
+              <button
+                v-if="canBid(job)"
+                @click="openBidModal(job)"
+                class="btn btn-sm btn-primary"
+              >
+                Postavi ponudu
+              </button>
+              <button
+                v-if="showBidsLink && job.userId === currentUserId"
+                @click="$emit('view-bids', job.id)"
+                class="btn btn-sm btn-outline-primary"
+              >
+                Vidi ponude
+              </button>
+              <button
+                v-if="canCancelOpen(job)"
+                @click="$emit('cancel-job', job)"
+                class="btn btn-sm btn-outline-danger"
+              >
+                Otkaži posao
+              </button>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -54,6 +63,31 @@
             />
           </div>
           <div class="mb-3">
+            <label class="form-label">Datum dolaska (opciono)</label>
+            <input
+              v-model="bidProposedDate"
+              type="date"
+              :min="todayIso"
+              class="form-control"
+            />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Procenjeno trajanje (opciono)</label>
+            <div class="d-flex gap-2">
+              <input
+                v-model.number="bidDurationValue"
+                type="number"
+                min="0"
+                class="form-control"
+                placeholder="npr. 4"
+              />
+              <select v-model="bidDurationUnit" class="form-select" style="max-width: 140px">
+                <option value="hours">sati</option>
+                <option value="days">dana</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
             <label class="form-label">Poruka (opciono)</label>
             <textarea v-model="bidMessage" rows="3" class="form-control"></textarea>
           </div>
@@ -71,8 +105,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, ref } from 'vue'
-import type { Job, JobStatus } from '@/types'
+import { computed, defineComponent, PropType, ref } from 'vue'
+import type { DurationUnit, Job } from '@/types'
+import { jobStatusBadge, jobStatusLabel } from '@/utils/statusLabels'
 
 export default defineComponent({
   name: 'JobsTable',
@@ -94,34 +129,40 @@ export default defineComponent({
       default: false
     }
   },
-  emits: ['submit-bid', 'view-bids'],
+  emits: ['submit-bid', 'view-bids', 'cancel-job'],
   setup(props, { emit }) {
     const activeJob = ref<Job | null>(null)
     const bidAmount = ref<number | null>(null)
     const bidMessage = ref('')
+    const bidProposedDate = ref('')
+    const bidDurationValue = ref<number | null>(null)
+    const bidDurationUnit = ref<DurationUnit>('hours')
     const bidError = ref('')
     const submitting = ref(false)
+
+    const todayIso = computed(() => new Date().toISOString().slice(0, 10))
+
+    const isExpired = (job: Job) =>
+      !!job.expiresAt && new Date(job.expiresAt).getTime() <= Date.now()
 
     const canBid = (job: Job) =>
       props.currentUserRole === 'worker' &&
       job.userId !== props.currentUserId &&
+      job.status === 'open' &&
+      !isExpired(job)
+
+    const canCancelOpen = (job: Job) =>
+      props.currentUserRole === 'client' &&
+      job.userId === props.currentUserId &&
       job.status === 'open'
-
-    const statusLabel = (s: JobStatus) =>
-      ({ open: 'Otvoren', assigned: 'Dodeljen', completed: 'Završen', closed: 'Zatvoren' }[s])
-
-    const statusBadgeClass = (s: JobStatus) => {
-      const base = 'badge '
-      if (s === 'open') return base + 'bg-warning text-dark'
-      if (s === 'assigned') return base + 'bg-success'
-      if (s === 'completed') return base + 'bg-secondary'
-      return base + 'bg-dark'
-    }
 
     const openBidModal = (job: Job) => {
       activeJob.value = job
       bidAmount.value = job.price
       bidMessage.value = ''
+      bidProposedDate.value = ''
+      bidDurationValue.value = null
+      bidDurationUnit.value = 'hours'
       bidError.value = ''
     }
 
@@ -139,13 +180,23 @@ export default defineComponent({
       bidError.value = ''
       try {
         await new Promise<void>((resolve, reject) => {
-          emit('submit-bid', {
+          const base: Record<string, unknown> = {
             jobId: activeJob.value!.id,
             amount: bidAmount.value!,
             message: bidMessage.value,
             resolve,
             reject
-          })
+          }
+          if (bidProposedDate.value) {
+            base.proposedDate = new Date(bidProposedDate.value).toISOString()
+          }
+          if (bidDurationValue.value !== null && bidDurationValue.value >= 0) {
+            base.estimatedDuration = {
+              value: bidDurationValue.value,
+              unit: bidDurationUnit.value
+            }
+          }
+          emit('submit-bid', base)
         })
         closeBidModal()
       } catch (err: any) {
@@ -158,11 +209,16 @@ export default defineComponent({
       activeJob,
       bidAmount,
       bidMessage,
+      bidProposedDate,
+      bidDurationValue,
+      bidDurationUnit,
       bidError,
       submitting,
+      todayIso,
       canBid,
-      statusLabel,
-      statusBadgeClass,
+      canCancelOpen,
+      jobStatusLabel,
+      jobStatusBadge,
       openBidModal,
       closeBidModal,
       submitBidForm

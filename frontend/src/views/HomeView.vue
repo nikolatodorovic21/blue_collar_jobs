@@ -20,7 +20,7 @@ import { ref, computed, onMounted } from 'vue'
 import JobsTable from '@/components/JobsTable.vue'
 import { getJobs, submitBid } from '@/services/api'
 import { authService } from '@/services/auth.service'
-import type { Job } from '@/types'
+import type { EstimatedDuration, Job } from '@/types'
 
 const allJobs = ref<Job[]>([])
 const currentUser = ref(authService.getCurrentUser())
@@ -49,13 +49,17 @@ const handleSubmitBid = async (payload: {
   jobId: string
   amount: number
   message: string
+  proposedDate?: string
+  estimatedDuration?: EstimatedDuration
   resolve: () => void
   reject: (e: unknown) => void
 }) => {
   try {
     await submitBid(payload.jobId, {
       amount: payload.amount,
-      message: payload.message
+      message: payload.message,
+      proposedDate: payload.proposedDate,
+      estimatedDuration: payload.estimatedDuration
     })
     payload.resolve()
     alert('Ponuda je uspešno poslata.')

@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import * as bidsService from '../services/bids.service';
 import { Job } from '../models/job.model';
+import { ConflictError, ForbiddenError, NotFoundError } from '../errors';
 
 export const submitBid = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { amount, message } = req.body;
+    const { amount, message, proposedDate, estimatedDuration } = req.body;
     const workerId = req.user!.id;
 
     const job = await Job.findById(req.params.id);
@@ -25,11 +26,17 @@ export const submitBid = async (req: Request, res: Response): Promise<void> => {
       jobId: job._id as any,
       workerId: workerId as any,
       amount,
-      message
+      message,
+      proposedDate,
+      estimatedDuration
     });
     res.status(201).json(bid);
-  } catch {
-    res.status(400).json({ message: 'Invalid bid data' });
+  } catch (err: any) {
+    if (err?.code === 11000) {
+      res.status(409).json({ message: 'Već ste poslali ponudu za ovaj posao' });
+      return;
+    }
+    res.status(400).json({ message: 'Neispravni podaci' });
   }
 };
 
@@ -79,14 +86,60 @@ export const acceptBid = async (req: Request, res: Response): Promise<void> => {
       res.status(403).json({ message: 'Samo vlasnik posla može prihvatiti ponudu' });
       return;
     }
-    if (job.status !== 'open') {
-      res.status(409).json({ message: 'Posao više nije otvoren za ponude' });
-      return;
-    }
 
     const updated = await bidsService.acceptBid(req.params.id);
     res.json(updated);
-  } catch {
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      res.status(404).json({ message: err.message });
+      return;
+    }
+    if (err instanceof ConflictError) {
+      res.status(409).json({ message: err.message });
+      return;
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const editBid = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const updated = await bidsService.editBid(req.params.id, req.user!.id, req.body);
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      res.status(404).json({ message: err.message });
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      res.status(403).json({ message: err.message });
+      return;
+    }
+    if (err instanceof ConflictError) {
+      res.status(409).json({ message: err.message });
+      return;
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const withdrawBid = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const updated = await bidsService.withdrawBid(req.params.id, req.user!.id);
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      res.status(404).json({ message: err.message });
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      res.status(403).json({ message: err.message });
+      return;
+    }
+    if (err instanceof ConflictError) {
+      res.status(409).json({ message: err.message });
+      return;
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };

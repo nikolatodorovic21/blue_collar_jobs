@@ -1,5 +1,6 @@
 import { Bid, IBid } from '../models/bid.model';
 import { Job } from '../models/job.model';
+import { ConflictError, ForbiddenError, NotFoundError } from '../errors';
 
 export const createBid = async (data: IBid) => {
   const bid = new Bid(data);
@@ -30,17 +31,64 @@ export const getBidById = async (id: string) => {
 
 export const acceptBid = async (bidId: string) => {
   const bid = await Bid.findById(bidId);
-  if (!bid) return null;
+  if (!bid) throw new NotFoundError('Ponuda nije pronađena');
+
+  const updatedJob = await Job.findOneAndUpdate(
+    { _id: bid.jobId, status: 'open' },
+    { status: 'assigned', assignedWorkerId: bid.workerId },
+    { new: true }
+  );
+  if (!updatedJob) {
+    throw new ConflictError('Posao više nije otvoren za ponude');
+  }
 
   await Bid.updateOne({ _id: bid._id }, { status: 'accepted' });
   await Bid.updateMany(
-    { jobId: bid.jobId, _id: { $ne: bid._id } },
+    { jobId: bid.jobId, _id: { $ne: bid._id }, status: 'pending' },
     { status: 'rejected' }
-  );
-  await Job.updateOne(
-    { _id: bid.jobId },
-    { status: 'assigned', assignedWorkerId: bid.workerId }
   );
 
   return await Bid.findById(bid._id);
+};
+
+export interface EditBidPatch {
+  amount?: number;
+  message?: string;
+  proposedDate?: Date;
+  estimatedDuration?: { value: number; unit: 'hours' | 'days' };
+}
+
+export const editBid = async (bidId: string, workerId: string, patch: EditBidPatch) => {
+  const bid = await Bid.findById(bidId);
+  if (!bid) throw new NotFoundError('Ponuda nije pronađena');
+  if (bid.workerId.toString() !== workerId) {
+    throw new ForbiddenError('Možete menjati samo svoje ponude');
+  }
+  if (bid.status !== 'pending') {
+    throw new ConflictError('Ponuda se više ne može menjati');
+  }
+  return await Bid.findByIdAndUpdate(bidId, patch, {
+    new: true,
+    runValidators: true
+  });
+};
+
+export const withdrawBid = async (bidId: string, workerId: string) => {
+  const bid = await Bid.findById(bidId);
+  if (!bid) throw new NotFoundError('Ponuda nije pronađena');
+  if (bid.workerId.toString() !== workerId) {
+    throw new ForbiddenError('Možete povući samo svoje ponude');
+  }
+  if (bid.status !== 'pending') {
+    throw new ConflictError('Ponuda se više ne može povući');
+  }
+  return await Bid.findByIdAndUpdate(
+    bidId,
+    { status: 'withdrawn' },
+    { new: true }
+  );
+};
+
+export const cascadePendingBidsToExpired = async (jobId: unknown) => {
+  await Bid.updateMany({ jobId, status: 'pending' }, { status: 'expired' });
 };
