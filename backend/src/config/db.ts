@@ -1,16 +1,17 @@
 import mongoose from 'mongoose';
+import { logger } from '../utils/logger';
 
 export const connectDB = async () => {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
-    console.error('❌ MONGODB_URI is not set. Add it to backend/.env');
+    logger.error('MONGODB_URI is not set. Add it to backend/.env');
     process.exit(1);
   }
   try {
     await mongoose.connect(uri);
-    console.log('✅ Connected to MongoDB');
+    logger.info('mongo.connected');
   } catch (error) {
-    console.error('❌ Error connecting to MongoDB:', error);
+    logger.error({ err: error }, 'mongo.connect.failed');
     process.exit(1);
   }
 };

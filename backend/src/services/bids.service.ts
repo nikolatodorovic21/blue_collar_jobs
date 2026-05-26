@@ -1,8 +1,20 @@
 import { Bid, IBid } from '../models/bid.model';
 import { Job } from '../models/job.model';
 import { ConflictError, ForbiddenError, NotFoundError } from '../errors';
+import { logger } from '../utils/logger';
+
+const MAX_PENDING_BIDS_PER_WORKER = 10;
 
 export const createBid = async (data: IBid) => {
+  const pendingCount = await Bid.countDocuments({
+    workerId: data.workerId,
+    status: 'pending'
+  });
+  if (pendingCount >= MAX_PENDING_BIDS_PER_WORKER) {
+    throw new ConflictError(
+      `Dostigli ste maksimalan broj aktivnih ponuda (${MAX_PENDING_BIDS_PER_WORKER}).`
+    );
+  }
   const bid = new Bid(data);
   return await bid.save();
 };
@@ -46,6 +58,15 @@ export const acceptBid = async (bidId: string) => {
   await Bid.updateMany(
     { jobId: bid.jobId, _id: { $ne: bid._id }, status: 'pending' },
     { status: 'rejected' }
+  );
+
+  logger.info(
+    {
+      bidId: bid._id.toString(),
+      jobId: bid.jobId.toString(),
+      workerId: bid.workerId.toString()
+    },
+    'bid.accepted'
   );
 
   return await Bid.findById(bid._id);

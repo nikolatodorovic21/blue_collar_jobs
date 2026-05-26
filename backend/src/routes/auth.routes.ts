@@ -2,11 +2,12 @@ import { Router } from 'express';
 import { loginUser, logoutUser, getMe } from '../controllers/auth.controller';
 import { validate } from '../middleware/validate';
 import { requireAuth } from '../middleware/requireAuth';
+import { loginLimiter } from '../middleware/rateLimit';
 import { loginSchema } from '../schemas/auth.schema';
 
 const router = Router();
 
-router.post('/login', validate(loginSchema), (req, res, next) => {
+router.post('/login', loginLimiter, validate(loginSchema), (req, res, next) => {
   loginUser(req, res).catch(next);
 });
 

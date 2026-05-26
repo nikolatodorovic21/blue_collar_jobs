@@ -2,7 +2,7 @@
 title: Project Overview
 type: reference
 status: living
-updated: 2026-05-25b
+updated: 2026-05-26e
 ---
 
 # Project Overview — Poslovi
@@ -40,6 +40,10 @@ monorepo/
 | Password hashing | bcryptjs (10 rounds) |
 | Auth tokens | jsonwebtoken (HS256, 7-day) in httpOnly cookie |
 | CSRF | csrf-csrf (double-submit, X-CSRF-Token header) |
+| Security headers | helmet (with CSP whitelisting `CLIENT_ORIGIN`) |
+| Rate limiting | express-rate-limit (in-memory per-IP, per-route) |
+| HTML sanitization | sanitize-html (Zod `.transform()` on free-text fields) |
+| Logging | pino + pino-http (JSON in prod, pretty in dev, silent in test) |
 | Request validation | zod (`.strict()` per resource) |
 | Frontend framework | Vue 3.5 + TypeScript 5.8 |
 | Build tool | Vite 6.2 |
@@ -61,14 +65,21 @@ Base path: `/api`
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/jobs` | public | All jobs. No filters yet. |
+| `GET` | `/api/jobs` | public | Filtered + cursor-paginated. Query params (all optional): `type` (enum), `location` (substring, case-insensitive), `priceMin`, `priceMax`, `status`, `limit` (default 20, max 100), `cursor`. AND composition. Response envelope `{ items, nextCursor }`. See [[01-decisions/015-cursor-pagination-shape]] + [[01-decisions/014-job-categories-enum]]. Runs the lazy-expiry sweep before filtering. |
 | `GET` | `/api/jobs/:id` | public | Single job by id. 404 if missing. |
 | `POST` | `/api/jobs` | auth + `client` + Zod + CSRF | Create a job. Body: `{type, price, location, description}`. `userId` derived from `req.user.id`. |
-| `POST` | `/api/jobs/:id/bids` | auth + `worker` + Zod + CSRF | Worker submits a bid. Body: `{amount, message?}`. `workerId` derived from `req.user.id`. 403 self-bid, 409 if `job.status !== 'open'`. |
+| `POST` | `/api/jobs/:id/bids` | auth + `worker` + Zod + CSRF | Worker submits a bid. Body: `{amount, message?, proposedDate?, estimatedDuration?}`. `workerId` derived from `req.user.id`. 403 self-bid, 409 if `job.status !== 'open'` OR worker already bid on this job (unique `{jobId, workerId}`). |
 | `GET` | `/api/jobs/:id/bids` | auth | Job owner sees full list (worker populated with `name`/`email`); non-owners see only their own bid for that job. |
 | `GET` | `/api/bids` | auth + `worker` | Caller's own bids. Query params ignored — `workerId` always = `req.user.id`. |
-| `PATCH` | `/api/bids/:id/accept` | auth + `client` + CSRF | Accept a bid. Ownership: `req.user.id === job.userId`. 409 if `job.status !== 'open'`. On success: bid → `accepted`, siblings → `rejected`, job → `assigned`. |
+| `PATCH` | `/api/bids/:id/accept` | auth + `client` + CSRF | Accept a bid. Ownership: `req.user.id === job.userId`. Atomic via `Job.findOneAndUpdate({ _id, status:'open' }, ...)`; 409 if the job is no longer open. On success: bid → `accepted`, siblings (pending) → `rejected`, job → `assigned`. |
+| `PATCH` | `/api/bids/:id` | auth + `worker` + Zod + CSRF | Worker edits own bid while `status === 'pending'`. Editable: `amount`, `message`, `proposedDate`, `estimatedDuration`. 403 if not owner; 409 if not pending. |
+| `PATCH` | `/api/bids/:id/withdraw` | auth + `worker` + CSRF | Worker withdraws own pending bid → `status: 'withdrawn'`. 403 if not owner; 409 if not pending. |
+| `PATCH` | `/api/jobs/:id/status` | auth + Zod + CSRF | Transition the job. Body: `{status, reason?}`. Server cross-checks `(from, to)` against the matrix in [backend/src/constants/jobStatusTransitions.ts](../backend/src/constants/jobStatusTransitions.ts) and enforces actor (`client` owner / `worker` = assigned / `either`). `cancel` + `dispute` require `reason`. Cascade: pending bids → `expired` on `cancelled` and on expiry-sweep `closed`. |
+| `DELETE` | `/api/jobs/:id` | auth + Zod + CSRF | Soft-cancel. Optional `{ reason }` body (HTML-stripped, default `'Obrisano od strane vlasnika'`). Thin wrapper over `transitionJobStatus(... 'cancelled', reason)` — same actor matrix (open: client owner; assigned: either party). Returns 200 + the updated job; pending bids cascade to `expired`. Per ADR 012 — no `deletedAt` field; "cancelled" *is* the soft-delete. The frontend's existing "Otkaži posao" PATCH covers the user-facing flow; DELETE exists as a REST affordance for API clients. |
 | `POST` | `/api/users` | public + Zod | Register. Bcrypt-hashes password, **auto-login** (issues JWT + CSRF cookies). |
+| `GET` | `/api/users/:id` | public | Sanitized projection per [[01-decisions/013-public-user-route-shape]]: `{ id, name, role, skills, rating: { average, count } }`. 404 on invalid ObjectId or missing user. Address intentionally not selected. |
+| `POST` | `/api/reviews` | auth + Zod + CSRF | Submit a review. Body: `{ jobId, rating: 1..5, comment? }`. Server derives `reviewerId` from `req.user.id` and `revieweeId` from the *other* participant (`job.userId` ↔ `job.assignedWorkerId`). 403 if caller wasn't on the job; 409 if job isn't `completed` or if the caller already reviewed it. |
+| `GET` | `/api/reviews?userId=` | public | Reviews about `userId` (i.e. `revieweeId === userId`), reviewer populated with `name`/`role`, job populated with `type`, sorted newest first. |
 | `POST` | `/api/auth/login` | public + Zod | Login. `bcrypt.compare`. On success issues JWT + CSRF cookies. 401 on miss (generic message). |
 | `POST` | `/api/auth/logout` | public | Clears the token cookie. |
 | `GET` | `/api/auth/me` | auth | Returns the current user from DB (identity from cookie). Used by frontend on app boot to rehydrate. |
@@ -79,6 +90,7 @@ Base path: `/api`
 - Jobs — `backend/src/routes/jobs.routes.ts`, `controllers/jobs.controller.ts`, `services/jobs.service.ts`
 - Bids — `backend/src/routes/bids.routes.ts`, `controllers/bids.controller.ts`, `services/bids.service.ts`, `models/bid.model.ts`
 - Users — `backend/src/routes/users.routes.ts`, `controllers/users.controller.ts`, `services/users.service.ts`
+- Reviews — `backend/src/routes/reviews.routes.ts`, `controllers/reviews.controller.ts`, `services/reviews.service.ts`, `models/review.model.ts`
 - Auth — `backend/src/routes/auth.routes.ts`, `controllers/auth.controller.ts`, `services/auth.service.ts`
 
 ---
@@ -166,7 +178,25 @@ Files: [JobBidsView.vue](../frontend/src/views/JobBidsView.vue) → [api.ts `acc
 | Non-client calls `PATCH /api/bids/:id/accept` | `403`  | `Samo klijenti mogu izvršiti ovu radnju`                       |
 | Non-owner accepts a bid                       | `403`  | `Samo vlasnik posla može prihvatiti ponudu`                    |
 | Accept on job where `status !== 'open'`       | `409`  | `Posao više nije otvoren za ponude`                            |
+| Duplicate bid (same worker, same job)         | `409`  | `Već ste poslali ponudu za ovaj posao`                         |
+| Edit/withdraw a non-pending bid               | `409`  | `Ponuda se više ne može menjati` / `… povući`                  |
+| Edit/withdraw a bid you don't own             | `403`  | `Možete menjati / povući samo svoje ponude`                    |
+| Job-status transition not in the matrix       | `409`  | `Nedozvoljena promena statusa`                                 |
+| Job-status transition by wrong actor          | `403`  | `Nemate dozvolu za ovu promenu statusa`                        |
+| Cancel/dispute transition without `reason`    | `409`  | `Razlog je obavezan za ovu promenu statusa`                    |
+| Review on a job that isn't `completed`        | `409`  | `Recenzija je moguća tek kada je posao završen`                |
+| Review by a non-participant                   | `403`  | `Niste učestvovali u ovom poslu`                               |
+| Duplicate review (same reviewer + job)        | `409`  | `Već ste ostavili recenziju za ovaj posao`                     |
+| `GET /api/users/:id` for missing / bad id     | `404`  | `Korisnik nije pronađen`                                       |
+| `GET /api/jobs` with `priceMin > priceMax`    | `400`  | `Neispravni podaci` + `errors.priceMin = 'priceMin ne sme biti veći od priceMax'` |
+| `GET /api/jobs` with a malformed `cursor`     | `400`  | `Nevažeći cursor`                                              |
 | Zod validation failure                        | `400`  | `Neispravni podaci` + `errors: { field: msg }`                 |
+| `Bid.amount` / `Job.price` out of `[1, 10_000_000]` | `400` | `Neispravni podaci` + `errors.amount` / `errors.price` |
+| 11th pending bid by same worker               | `409`  | `Dostigli ste maksimalan broj aktivnih ponuda (10).`           |
+| `DELETE /api/jobs/:id` on already-cancelled job | `409` | `Nedozvoljena promena statusa`                                 |
+| `DELETE /api/jobs/:id` by non-owner client    | `403`  | `Nemate dozvolu za ovu promenu statusa`                        |
+| Rate-limit exceeded (login / register / job-create / bid-submit) | `429` | `Previše zahteva, pokušajte ponovo kasnije.` |
+| Any uncaught controller error                 | `500`  | `Serverska greška`                                             |
 
 ### Try it yourself with curl
 
@@ -215,17 +245,23 @@ curl http://localhost:5000/api/jobs/<JOB_ID>
 
 | Field | Type | Notes |
 |---|---|---|
-| `type` | `string` | Job category (e.g. Keramika, Elektrika) |
+| `type` | `enum` | One of `'keramika' \| 'stolarija' \| 'elektrika' \| 'vodoinstalater' \| 'molerski_poslovi' \| 'ostalo'`. Snake_case keys are the persisted/wire values; display labels live in [frontend/src/constants/jobTypes.ts](../frontend/src/constants/jobTypes.ts) (`jobTypeLabel`). See [[01-decisions/014-job-categories-enum]]. |
 | `price` | `number` | Orientation price in RSD |
 | `location` | `string` | Work location / city |
 | `description` | `string` | Detailed job description |
-| `status` | `'open' \| 'assigned' \| 'completed' \| 'closed'` | Default `'open'`. Flips to `'assigned'` on accept. `completed`/`closed` enum-valid but not yet wired to UI. |
+| `status` | `'open' \| 'assigned' \| 'in_progress' \| 'completed' \| 'cancelled' \| 'closed' \| 'disputed'` | Default `'open'`. Transitions via `PATCH /api/jobs/:id/status` (matrix in [backend/src/constants/jobStatusTransitions.ts](../backend/src/constants/jobStatusTransitions.ts) per [[01-decisions/012-job-status-enum-extension]]). |
 | `userId` | `ObjectId` | Ref to `User`. **Poster only; never mutated post-create.** |
 | `assignedWorkerId` | `ObjectId` | Ref to `User`. Set only when a bid is accepted. |
+| `completedAt` | `Date?` | Stamped on transition to `completed`. |
+| `cancelledAt` | `Date?` | Stamped on transition to `cancelled`. |
+| `cancelReason` | `string?` | Captured on transition to `cancelled` (or `disputed`). |
+| `expiresAt` | `Date?` | Server-side default `createdAt + 30d` per [[01-decisions/010-bid-and-job-expiry]]. `null` = no expiry (existing rows). |
 | `createdAt` | `Date` | Added via `{ timestamps: true }` |
 | `updatedAt` | `Date` | Added via `{ timestamps: true }` |
 
 > The pre-pivot `taken: boolean` field is gone. The pre-pivot misuse of `userId` to mean *both* poster and assignee is fixed — `userId` is poster-only, `assignedWorkerId` carries the winner.
+
+**Indexes:** `{ status: 1, createdAt: -1 }` (primary HomeView query — status filter + the default sort), `{ type: 1 }` (solo type filter), `{ userId: 1 }` (implicit when a client views their own jobs). Added in Group 3 per the architecture-follow-ups indexing-review trigger.
 
 ### Bid
 *Mongoose schema ([backend/src/models/bid.model.ts](../backend/src/models/bid.model.ts))*
@@ -236,11 +272,13 @@ curl http://localhost:5000/api/jobs/<JOB_ID>
 | `workerId` | `ObjectId` | Ref `User`, required, indexed |
 | `amount` | `number` | RSD; `min: 0` |
 | `message` | `string` | Optional, default `''` |
-| `status` | `'pending' \| 'accepted' \| 'rejected'` | Default `'pending'` |
+| `status` | `'pending' \| 'accepted' \| 'rejected' \| 'withdrawn' \| 'expired'` | Default `'pending'`. `withdrawn` set by `PATCH /api/bids/:id/withdraw`; `expired` set by the lazy expiry sweep and by cancel cascade. |
+| `proposedDate` | `Date?` | Optional; worker-offered arrival date. Zod-guarded to be in the future at submit/edit time. |
+| `estimatedDuration` | `{ value: number; unit: 'hours'\|'days' }?` | Optional; worker-offered length of work. |
 | `createdAt` | `Date` | Added via `{ timestamps: true }` |
 | `updatedAt` | `Date` | Added via `{ timestamps: true }` |
 
-Compound index on `{ jobId, workerId }` (helps the soft "has this worker already bid?" lookup; not a unique constraint — bid editability is an open question in [[project-plan]]).
+Compound **unique** index on `{ jobId, workerId }` — one bid per worker per job. Edits mutate in place (per [[01-decisions/009-bid-editability-while-pending]]).
 
 ### User
 *Mongoose schema ([backend/src/models/user.model.ts](../backend/src/models/user.model.ts))*
@@ -257,7 +295,19 @@ Compound index on `{ jobId, workerId }` (helps the soft "has this worker already
 | `updatedAt` | `Date` | Added via `{ timestamps: true }` |
 
 ### Review
-*Present in `db.json` only — no Mongoose model yet. Tracked in [[project-plan]] Tier 3.*
+*Mongoose schema ([backend/src/models/review.model.ts](../backend/src/models/review.model.ts))*
+
+| Field | Type | Notes |
+|---|---|---|
+| `jobId` | `ObjectId` | Ref `Job`, required, indexed |
+| `reviewerId` | `ObjectId` | Ref `User`, required, indexed. Always `req.user.id`; never trusted from the body. |
+| `revieweeId` | `ObjectId` | Ref `User`, required, indexed. Server-derived from job participants (the *other* party). |
+| `rating` | `number` | Required, `min: 1`, `max: 5`. |
+| `comment` | `string` | Optional, default `''`, max 1000 chars. |
+| `createdAt` | `Date` | Added via `{ timestamps: true }` |
+| `updatedAt` | `Date` | Added via `{ timestamps: true }` |
+
+Unique compound index on `{ jobId, reviewerId }` — one review per reviewer per job. Separate `{ revieweeId }` index for "reviews about user X" queries. Bidirectional model: clients review workers AND workers review clients; today only the worker profile renders reviews.
 
 ---
 
@@ -267,10 +317,9 @@ Compound index on `{ jobId, workerId }` (helps the soft "has this worker already
 |---|---|---|
 | `/` | `HomeView` — all open jobs the user doesn't own | `requiresAuth` |
 | `/jobs` | `JobsView` — role-aware: worker sees "Moje ponude", client sees their posted jobs | `requiresAuth` |
-| `/jobs/:id/bids` | `JobBidsView` — bid list for a job; accept UI for the job owner | `requiresAuth` |
+| `/jobs/:id/bids` | `JobBidsView` — bid list for a job; accept UI for the job owner; "Ostavi recenziju" entry on `completed` | `requiresAuth` |
+| `/users/:id` | `WorkerProfileView` — public profile (name, role, skills, rating, reviews) | public |
 | `/post-job` | `PostJobView` — create a new job | `requiresAuth` + in-view `role === 'client'` (redirects otherwise) |
-| `/about` | `AboutView` *(stub)* | `requiresAuth` |
-| `/contact` | `ContactView` *(stub)* | `requiresAuth` |
 | `/login` | `LoginView` | `guestOnly` |
 | `/register` | `RegisterView` | `guestOnly` |
 

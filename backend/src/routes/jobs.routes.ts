@@ -3,17 +3,20 @@ import {
   getJobs,
   getJob,
   addJob,
-  updateJobStatus
+  updateJobStatus,
+  deleteJob
 } from '../controllers/jobs.controller';
 import { submitBid, getBidsForJob } from '../controllers/bids.controller';
 import { requireAuth } from '../middleware/requireAuth';
 import { requireRole } from '../middleware/requireRole';
 import { validate } from '../middleware/validate';
 import { validateQuery } from '../middleware/validateQuery';
+import { jobCreateLimiter, bidSubmitLimiter } from '../middleware/rateLimit';
 import {
   createJobSchema,
   getJobsQuerySchema,
-  updateJobStatusSchema
+  updateJobStatusSchema,
+  deleteJobSchema
 } from '../schemas/job.schema';
 import { submitBidSchema } from '../schemas/bid.schema';
 
@@ -29,6 +32,7 @@ router.get('/:id', (req, res, next) => {
 
 router.post(
   '/',
+  jobCreateLimiter,
   requireAuth,
   requireRole('client'),
   validate(createJobSchema),
@@ -39,6 +43,7 @@ router.post(
 
 router.post(
   '/:id/bids',
+  bidSubmitLimiter,
   requireAuth,
   requireRole('worker'),
   validate(submitBidSchema),
@@ -57,6 +62,15 @@ router.patch(
   validate(updateJobStatusSchema),
   (req, res, next) => {
     updateJobStatus(req, res).catch(next);
+  }
+);
+
+router.delete(
+  '/:id',
+  requireAuth,
+  validate(deleteJobSchema),
+  (req, res, next) => {
+    deleteJob(req, res).catch(next);
   }
 );
 

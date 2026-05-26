@@ -11,7 +11,7 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
   }
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    res.status(500).json({ message: 'JWT_SECRET not configured' });
+    res.status(500).json({ message: 'JWT_SECRET nije konfigurisan' });
     return;
   }
   try {
