@@ -7,6 +7,9 @@ export type JobStatus =
   | 'closed'
   | 'disputed'
 
+export type { JobType } from '@/constants/jobTypes'
+import type { JobType } from '@/constants/jobTypes'
+
 export type BidStatus =
   | 'pending'
   | 'accepted'
@@ -23,7 +26,7 @@ export interface EstimatedDuration {
 
 export interface Job {
   id: string
-  type: string
+  type: JobType
   price: number
   location: string
   description: string
@@ -58,4 +61,23 @@ export interface User {
   role: 'worker' | 'client'
   skills?: string[]
   address?: string
+}
+
+export interface Review {
+  id: string
+  jobId: string | { id: string; type: string }
+  reviewerId: string | { id: string; name: string; role: 'worker' | 'client' }
+  revieweeId: string
+  rating: number
+  comment: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PublicUser {
+  id: string
+  name: string
+  role: 'worker' | 'client'
+  skills: string[]
+  rating: { average: number | null; count: number }
 }

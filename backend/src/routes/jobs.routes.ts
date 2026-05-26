@@ -9,12 +9,17 @@ import { submitBid, getBidsForJob } from '../controllers/bids.controller';
 import { requireAuth } from '../middleware/requireAuth';
 import { requireRole } from '../middleware/requireRole';
 import { validate } from '../middleware/validate';
-import { createJobSchema, updateJobStatusSchema } from '../schemas/job.schema';
+import { validateQuery } from '../middleware/validateQuery';
+import {
+  createJobSchema,
+  getJobsQuerySchema,
+  updateJobStatusSchema
+} from '../schemas/job.schema';
 import { submitBidSchema } from '../schemas/bid.schema';
 
 const router = Router();
 
-router.get('/', (req, res, next) => {
+router.get('/', validateQuery(getJobsQuerySchema), (req, res, next) => {
   getJobs(req, res).catch(next);
 });
 

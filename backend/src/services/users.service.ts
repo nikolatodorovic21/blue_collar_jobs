@@ -16,3 +16,7 @@ export const findUserByEmail = async (email: string) => {
 export const findUserById = async (id: string) => {
   return await User.findById(id);
 };
+
+export const findPublicUserById = async (id: string) => {
+  return await User.findById(id).select('name role skills');
+};

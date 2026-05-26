@@ -25,7 +25,7 @@
                 v-if="bidJob(bid)"
                 :to="`/jobs/${typeof bid.jobId === 'object' ? bid.jobId.id : ''}/bids`"
               >
-                {{ bidJob(bid)?.type }}
+                {{ jobTypeLabel(bidJob(bid)?.type) }}
               </router-link>
               <span v-else>—</span>
             </td>
@@ -146,6 +146,7 @@ import { authService } from '@/services/auth.service'
 import type { Bid, DurationUnit, Job } from '@/types'
 import { formatDate, formatDuration, isEdited } from '@/utils/format'
 import { bidStatusBadge, bidStatusLabel } from '@/utils/statusLabels'
+import { jobTypeLabel } from '@/constants/jobTypes'
 
 const router = useRouter()
 const currentUser = ref(authService.getCurrentUser())
@@ -172,8 +173,8 @@ const reloadBids = async () => {
 }
 
 const reloadJobs = async () => {
-  const response = await getJobs()
-  allJobs.value = response.data
+  const response = await getJobs({ limit: 100 })
+  allJobs.value = response.data.items
 }
 
 // --- Withdraw ---

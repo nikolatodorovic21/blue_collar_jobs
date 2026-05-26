@@ -1,4 +1,5 @@
 import { Schema, Types, model } from 'mongoose';
+import { JOB_TYPES, JobType } from '../constants/jobTypes';
 
 export type JobStatus =
   | 'open'
@@ -10,7 +11,7 @@ export type JobStatus =
   | 'disputed';
 
 export interface IJob {
-  type: string;
+  type: JobType;
   price: number;
   location: string;
   description: string;
@@ -27,7 +28,7 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 const jobSchema = new Schema<IJob>(
   {
-    type: { type: String, required: true },
+    type: { type: String, enum: JOB_TYPES, required: true },
     price: { type: Number, required: true },
     location: { type: String, required: true },
     description: { type: String, required: true },
@@ -45,6 +46,10 @@ const jobSchema = new Schema<IJob>(
   },
   { timestamps: true }
 );
+
+jobSchema.index({ status: 1, createdAt: -1 });
+jobSchema.index({ type: 1 });
+jobSchema.index({ userId: 1 });
 
 jobSchema.set('toJSON', {
   virtuals: true,

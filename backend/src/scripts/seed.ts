@@ -31,12 +31,12 @@ const main = async () => {
     password: 'lozinka123',
     name: 'Majstor Test',
     role: 'worker',
-    skills: ['Keramika']
+    skills: ['keramika']
   });
   console.log(`Worker created: ${worker.email} (${worker._id})`);
 
   const job = await createJob({
-    type: 'Keramika',
+    type: 'keramika',
     price: 15000,
     location: 'Novi Sad',
     description: 'Postavljanje keramike u kupatilu (~6 m2)',

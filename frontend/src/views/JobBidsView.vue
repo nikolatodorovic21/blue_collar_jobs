@@ -3,7 +3,7 @@
     <p v-if="loading">Učitavanje...</p>
 
     <template v-else-if="job">
-      <h1>Ponude na posao: {{ job.type }}</h1>
+      <h1>Ponude na posao: {{ jobTypeLabel(job.type) }}</h1>
       <p class="text-muted">
         {{ job.location }} — orijentaciona cena {{ job.price }} RSD
         <span :class="jobStatusBadge(job.status)" style="margin-left: 8px">
@@ -47,6 +47,13 @@
         >
           Prijavi spor
         </button>
+        <button
+          v-if="canLeaveReview"
+          class="btn btn-sm btn-primary"
+          @click="openReview"
+        >
+          Ostavi recenziju
+        </button>
       </div>
 
       <p v-if="!isOwner && !isAssignedWorker" class="text-danger">
@@ -68,7 +75,13 @@
         <tbody>
           <tr v-for="bid in bids" :key="bid.id">
             <td>
-              {{ workerName(bid) }}
+              <router-link
+                v-if="workerIdOf(bid)"
+                :to="`/users/${workerIdOf(bid)}`"
+              >
+                {{ workerName(bid) }}
+              </router-link>
+              <span v-else>{{ workerName(bid) }}</span>
               <span v-if="isEdited(bid.createdAt, bid.updatedAt)" class="text-muted ms-1">(uređeno)</span>
             </td>
             <td>{{ bid.amount }} RSD</td>
@@ -104,6 +117,16 @@
         @confirm="submitReason"
         @cancel="closeReasonModal"
       />
+
+      <ReviewModal
+        v-if="reviewModalOpen"
+        :job-type="jobTypeLabel(job.type)"
+        :reviewee-name="otherPartyName"
+        :submitting="reviewSubmitting"
+        :error="reviewError"
+        @confirm="submitReview"
+        @cancel="closeReviewModal"
+      />
     </template>
 
     <p v-else class="text-danger">Posao nije pronađen.</p>
@@ -117,10 +140,12 @@ import {
   getJobById,
   getBidsForJob,
   acceptBid,
-  updateJobStatus
+  updateJobStatus,
+  createReview,
+  listReviews
 } from '@/services/api'
 import { authService } from '@/services/auth.service'
-import type { Bid, Job, JobStatus } from '@/types'
+import type { Bid, Job, JobStatus, Review } from '@/types'
 import { formatDate, formatDuration, isEdited } from '@/utils/format'
 import {
   bidStatusBadge,
@@ -129,6 +154,8 @@ import {
   jobStatusLabel
 } from '@/utils/statusLabels'
 import StatusReasonModal from '@/components/StatusReasonModal.vue'
+import ReviewModal from '@/components/ReviewModal.vue'
+import { jobTypeLabel } from '@/constants/jobTypes'
 
 const route = useRoute()
 const currentUser = ref(authService.getCurrentUser())
@@ -150,6 +177,9 @@ const isAssignedWorker = computed(
 const workerName = (bid: Bid) =>
   typeof bid.workerId === 'object' ? bid.workerId.name : bid.workerId
 
+const workerIdOf = (bid: Bid): string | null =>
+  typeof bid.workerId === 'object' ? bid.workerId.id : bid.workerId || null
+
 const canAccept = (bid: Bid) =>
   isOwner.value && bid.status === 'pending' && job.value?.status === 'open'
 
@@ -170,6 +200,40 @@ const canDispute = computed(
     job.value?.status === 'in_progress'
 )
 
+const otherPartyId = computed<string | null>(() => {
+  if (!job.value || !currentUser.value) return null
+  if (isOwner.value) return job.value.assignedWorkerId ?? null
+  if (isAssignedWorker.value) return job.value.userId ?? null
+  return null
+})
+
+const otherPartyName = computed(() => {
+  if (!job.value) return ''
+  if (isOwner.value) {
+    const winning = bids.value.find((b) => b.status === 'accepted')
+    return winning ? workerName(winning) : 'Majstor'
+  }
+  return 'Klijent'
+})
+
+const reviewsAboutOtherParty = ref<Review[]>([])
+const reviewedByMe = computed(() => {
+  if (!currentUser.value || !job.value) return false
+  return reviewsAboutOtherParty.value.some((r) => {
+    const reviewerId = typeof r.reviewerId === 'object' ? r.reviewerId.id : r.reviewerId
+    const reviewJobId = typeof r.jobId === 'object' ? r.jobId.id : r.jobId
+    return reviewerId === currentUser.value!.id && reviewJobId === job.value!.id
+  })
+})
+
+const canLeaveReview = computed(
+  () =>
+    !!currentUser.value &&
+    (isOwner.value || isAssignedWorker.value) &&
+    job.value?.status === 'completed' &&
+    !reviewedByMe.value
+)
+
 const load = async () => {
   const [jobResp, bidsResp] = await Promise.all([
     getJobById(jobId.value),
@@ -177,6 +241,16 @@ const load = async () => {
   ])
   job.value = jobResp.data
   bids.value = bidsResp.data
+
+  reviewsAboutOtherParty.value = []
+  if (job.value?.status === 'completed' && otherPartyId.value) {
+    try {
+      const res = await listReviews(otherPartyId.value)
+      reviewsAboutOtherParty.value = res.data
+    } catch (err) {
+      console.error('Greška pri učitavanju recenzija:', err)
+    }
+  }
 }
 
 const accept = async (bid: Bid) => {
@@ -260,6 +334,39 @@ const closeReasonModal = () => {
 const submitReason = (reason: string) => {
   if (!reasonModal.value) return
   transition(reasonModal.value.targetStatus, reason)
+}
+
+// Review modal
+const reviewModalOpen = ref(false)
+const reviewSubmitting = ref(false)
+const reviewError = ref('')
+
+const openReview = () => {
+  reviewError.value = ''
+  reviewModalOpen.value = true
+}
+
+const closeReviewModal = () => {
+  reviewModalOpen.value = false
+  reviewSubmitting.value = false
+}
+
+const submitReview = async (payload: { rating: number; comment: string }) => {
+  if (!job.value) return
+  reviewSubmitting.value = true
+  reviewError.value = ''
+  try {
+    await createReview({
+      jobId: job.value.id,
+      rating: payload.rating,
+      comment: payload.comment || undefined
+    })
+    await load()
+    closeReviewModal()
+  } catch (err: any) {
+    reviewError.value = err?.response?.data?.message || 'Greška pri slanju recenzije.'
+    reviewSubmitting.value = false
+  }
 }
 
 onMounted(async () => {

@@ -1,6 +1,7 @@
 import request, { Test } from 'supertest';
 import type { Express } from 'express';
 import app from '../app';
+import type { JobStatus } from '../models/job.model';
 
 export type Role = 'client' | 'worker';
 
@@ -83,7 +84,7 @@ export const createJob = async (
   }> = {}
 ) => {
   const body = {
-    type: overrides.type ?? 'Keramika',
+    type: overrides.type ?? 'keramika',
     price: overrides.price ?? 10000,
     location: overrides.location ?? 'Beograd',
     description: overrides.description ?? 'Testni posao'
@@ -110,6 +111,37 @@ export const submitBid = async (
   ).send(body);
   if (res.status !== 201) {
     throw new Error(`submitBid failed: ${res.status} ${JSON.stringify(res.body)}`);
+  }
+  return res.body;
+};
+
+export const acceptBid = async (client: AuthedClient, bidId: string) => {
+  const res = await withCsrf(
+    client.agent.patch(`/api/bids/${bidId}/accept`),
+    client.csrfToken
+  ).send();
+  if (res.status !== 200) {
+    throw new Error(`acceptBid failed: ${res.status} ${JSON.stringify(res.body)}`);
+  }
+  return res.body;
+};
+
+export const transitionJobStatus = async (
+  actor: AuthedClient,
+  jobId: string,
+  status: JobStatus,
+  reason?: string
+) => {
+  const body: Record<string, unknown> = { status };
+  if (reason !== undefined) body.reason = reason;
+  const res = await withCsrf(
+    actor.agent.patch(`/api/jobs/${jobId}/status`),
+    actor.csrfToken
+  ).send(body);
+  if (res.status !== 200) {
+    throw new Error(
+      `transitionJobStatus(${status}) failed: ${res.status} ${JSON.stringify(res.body)}`
+    );
   }
   return res.body;
 };
