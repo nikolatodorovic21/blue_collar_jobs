@@ -191,3 +191,16 @@ export const transitionJobStatus = async (
 
   return updated;
 };
+
+export const softDeleteJob = async (
+  jobId: string,
+  ctx: TransitionContext,
+  reason?: string
+) => {
+  return await transitionJobStatus(
+    jobId,
+    ctx,
+    'cancelled',
+    reason ?? 'Obrisano od strane vlasnika'
+  );
+};

@@ -4,6 +4,7 @@ import * as usersService from '../services/users.service';
 import * as reviewsService from '../services/reviews.service';
 import { setAuthCookie } from '../services/token.service';
 import { generateCsrfToken } from '../middleware/csrf';
+import { logger } from '../utils/logger';
 
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -16,9 +17,17 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
     const user = await usersService.createUser(req.body);
     setAuthCookie(req, res, (user._id as any).toString(), user.role);
     generateCsrfToken(req, res, { overwrite: true });
+    logger.info(
+      {
+        userId: (user._id as any).toString(),
+        email: user.email,
+        role: user.role
+      },
+      'auth.register.success'
+    );
     res.status(201).json(user);
   } catch (error: any) {
-    res.status(400).json({ message: error.message || 'Invalid user data' });
+    res.status(400).json({ message: error.message || 'Neispravni podaci korisnika' });
   }
 };
 
@@ -43,6 +52,6 @@ export const getPublicUser = async (req: Request, res: Response): Promise<void> 
       rating
     });
   } catch {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };

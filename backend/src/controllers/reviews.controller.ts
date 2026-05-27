@@ -25,7 +25,7 @@ export const createReview = async (req: Request, res: Response): Promise<void> =
       res.status(409).json({ message: err.message });
       return;
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };
 
@@ -39,6 +39,6 @@ export const listReviewsForUser = async (req: Request, res: Response): Promise<v
     const reviews = await reviewsService.listReviewsForUser(userId);
     res.json(reviews);
   } catch {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };

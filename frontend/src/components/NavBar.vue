@@ -24,12 +24,6 @@
           <li v-if="user?.role === 'client'" class="nav-item">
             <router-link to="/post-job" class="nav-link" active-class="active">Postavi posao</router-link>
           </li>
-          <li class="nav-item">
-            <router-link to="/about" class="nav-link" active-class="active">O nama</router-link>
-          </li>
-          <li class="nav-item">
-            <router-link to="/contact" class="nav-link" active-class="active">Kontakt</router-link>
-          </li>
         </ul>
         
         <!-- Login/Register ili User info -->

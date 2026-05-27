@@ -99,12 +99,21 @@ export const createJob = async (
 export const submitBid = async (
   worker: AuthedClient,
   jobId: string,
-  overrides: Partial<{ amount: number; message: string }> = {}
+  overrides: Partial<{
+    amount: number;
+    message: string;
+    proposedDate: string | Date;
+    estimatedDuration: { value: number; unit: 'hours' | 'days' };
+  }> = {}
 ) => {
-  const body = {
+  const body: Record<string, unknown> = {
     amount: overrides.amount ?? 9000,
     message: overrides.message ?? 'Mogu odmah'
   };
+  if (overrides.proposedDate !== undefined) body.proposedDate = overrides.proposedDate;
+  if (overrides.estimatedDuration !== undefined) {
+    body.estimatedDuration = overrides.estimatedDuration;
+  }
   const res = await withCsrf(
     worker.agent.post(`/api/jobs/${jobId}/bids`),
     worker.csrfToken
@@ -114,6 +123,20 @@ export const submitBid = async (
   }
   return res.body;
 };
+
+export const deleteJob = async (
+  actor: AuthedClient,
+  jobId: string,
+  reason?: string
+) => {
+  const body = reason !== undefined ? { reason } : {};
+  return await withCsrf(
+    actor.agent.delete(`/api/jobs/${jobId}`),
+    actor.csrfToken
+  ).send(body);
+};
+
+export const unauthedRequest = () => request(app as Express);
 
 export const acceptBid = async (client: AuthedClient, bidId: string) => {
   const res = await withCsrf(

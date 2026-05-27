@@ -1,18 +1,43 @@
 import { z } from 'zod';
 import { JOB_TYPES } from '../constants/jobTypes';
 import { JOB_STATUSES } from '../constants/jobStatusTransitions';
+import { stripHtml } from '../utils/sanitizeText';
 
-export const createJobSchema = z.object({
-  type: z.enum(JOB_TYPES),
-  price: z.number().nonnegative('Cena mora biti veća ili jednaka 0'),
-  location: z.string().min(1, 'Lokacija je obavezna'),
-  description: z.string().min(1, 'Opis je obavezan')
-}).strict();
+const PRICE_MIN = 1;
+const PRICE_MAX = 10_000_000;
+
+const sanitizedReason = z
+  .string()
+  .min(1)
+  .max(500)
+  .transform((v) => stripHtml(v));
+
+export const createJobSchema = z
+  .object({
+    type: z.enum(JOB_TYPES),
+    price: z
+      .number()
+      .min(PRICE_MIN, 'Cena mora biti najmanje 1 RSD')
+      .max(PRICE_MAX, 'Cena ne sme prelaziti 10.000.000 RSD'),
+    location: z.string().min(1, 'Lokacija je obavezna').max(200),
+    description: z
+      .string()
+      .min(1, 'Opis je obavezan')
+      .max(5000, 'Opis ne sme prelaziti 5000 karaktera')
+      .transform((v) => stripHtml(v))
+  })
+  .strict();
 
 export const updateJobStatusSchema = z
   .object({
     status: z.enum(['in_progress', 'completed', 'cancelled', 'disputed']),
-    reason: z.string().min(1).max(500).optional()
+    reason: sanitizedReason.optional()
+  })
+  .strict();
+
+export const deleteJobSchema = z
+  .object({
+    reason: sanitizedReason.optional()
   })
   .strict();
 

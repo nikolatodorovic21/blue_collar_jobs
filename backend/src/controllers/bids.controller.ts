@@ -36,6 +36,10 @@ export const submitBid = async (req: Request, res: Response): Promise<void> => {
       res.status(409).json({ message: 'Već ste poslali ponudu za ovaj posao' });
       return;
     }
+    if (err instanceof ConflictError) {
+      res.status(409).json({ message: err.message });
+      return;
+    }
     res.status(400).json({ message: 'Neispravni podaci' });
   }
 };
@@ -54,7 +58,7 @@ export const getBidsForJob = async (req: Request, res: Response): Promise<void> 
       : await bidsService.listBidsForJobByWorker(req.params.id, callerId);
     res.json(bids);
   } catch {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };
 
@@ -63,7 +67,7 @@ export const getMyBids = async (req: Request, res: Response): Promise<void> => {
     const bids = await bidsService.listBidsForWorker(req.user!.id);
     res.json(bids);
   } catch {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };
 
@@ -98,7 +102,7 @@ export const acceptBid = async (req: Request, res: Response): Promise<void> => {
       res.status(409).json({ message: err.message });
       return;
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };
 
@@ -119,7 +123,7 @@ export const editBid = async (req: Request, res: Response): Promise<void> => {
       res.status(409).json({ message: err.message });
       return;
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };
 
@@ -140,6 +144,6 @@ export const withdrawBid = async (req: Request, res: Response): Promise<void> =>
       res.status(409).json({ message: err.message });
       return;
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };

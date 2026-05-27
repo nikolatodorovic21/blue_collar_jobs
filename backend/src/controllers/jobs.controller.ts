@@ -15,7 +15,7 @@ export const getJobs = async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({ message: err.message });
       return;
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };
 
@@ -28,7 +28,7 @@ export const getJob = async (req: Request, res: Response): Promise<void> => {
     }
     res.json(job);
   } catch {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };
 
@@ -64,6 +64,32 @@ export const updateJobStatus = async (req: Request, res: Response): Promise<void
       res.status(409).json({ message: err.message });
       return;
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Serverska greška' });
+  }
+};
+
+export const deleteJob = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { reason } = req.body as { reason?: string };
+    const updated = await jobService.softDeleteJob(
+      req.params.id,
+      { userId: req.user!.id, role: req.user!.role },
+      reason
+    );
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      res.status(404).json({ message: err.message });
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      res.status(403).json({ message: err.message });
+      return;
+    }
+    if (err instanceof ConflictError) {
+      res.status(409).json({ message: err.message });
+      return;
+    }
+    res.status(500).json({ message: 'Serverska greška' });
   }
 };
